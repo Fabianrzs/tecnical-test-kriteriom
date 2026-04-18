@@ -1,0 +1,200 @@
+{
+  "uid": "kriteriom-system-health",
+  "title": "System Health",
+  "tags": ["kriteriom", "health", "infrastructure"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Credits API",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 3 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":1}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "up{job=\"credits-api\"}",
+        "legendFormat": "credits-api"
+      }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Risk API",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 3 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":1}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "up{job=\"risk-api\"}",
+        "legendFormat": "risk-api"
+      }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Audit API",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 3 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":1}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "up{job=\"audit-api\"}",
+        "legendFormat": "audit-api"
+      }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Batch Processor",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 3 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":1}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "up{job=\"batch-processor\"}",
+        "legendFormat": "batch-processor"
+      }]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Gateway",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 3 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":1}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "up{job=\"gateway\"}",
+        "legendFormat": "gateway"
+      }]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Notifications API",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 3 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":1}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "up{job=\"notifications-api\"}",
+        "legendFormat": "notifications-api"
+      }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Total Request Rate — All Services (req/s)",
+      "gridPos": { "x": 0, "y": 3, "w": 24, "h": 7 },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"credits-api\"}[1m]))", "legendFormat": "credits-api" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"risk-api\"}[1m]))", "legendFormat": "risk-api" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"audit-api\"}[1m]))", "legendFormat": "audit-api" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"batch-processor\"}[1m]))", "legendFormat": "batch-processor" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"gateway\"}[1m]))", "legendFormat": "gateway" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Memory Usage — All Services (MB)",
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 7 },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "process_working_set_bytes{job=\"credits-api\"} / 1024 / 1024", "legendFormat": "credits-api" },
+        { "datasource": "Prometheus", "expr": "process_working_set_bytes{job=\"risk-api\"} / 1024 / 1024", "legendFormat": "risk-api" },
+        { "datasource": "Prometheus", "expr": "process_working_set_bytes{job=\"audit-api\"} / 1024 / 1024", "legendFormat": "audit-api" },
+        { "datasource": "Prometheus", "expr": "process_working_set_bytes{job=\"batch-processor\"} / 1024 / 1024", "legendFormat": "batch-processor" },
+        { "datasource": "Prometheus", "expr": "process_working_set_bytes{job=\"gateway\"} / 1024 / 1024", "legendFormat": "gateway" }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "CPU Usage — All Services",
+      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 7 },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "rate(process_cpu_seconds_total{job=\"credits-api\"}[1m])", "legendFormat": "credits-api" },
+        { "datasource": "Prometheus", "expr": "rate(process_cpu_seconds_total{job=\"risk-api\"}[1m])", "legendFormat": "risk-api" },
+        { "datasource": "Prometheus", "expr": "rate(process_cpu_seconds_total{job=\"audit-api\"}[1m])", "legendFormat": "audit-api" },
+        { "datasource": "Prometheus", "expr": "rate(process_cpu_seconds_total{job=\"batch-processor\"}[1m])", "legendFormat": "batch-processor" },
+        { "datasource": "Prometheus", "expr": "rate(process_cpu_seconds_total{job=\"gateway\"}[1m])", "legendFormat": "gateway" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "5xx Error Rate — All Services",
+      "gridPos": { "x": 0, "y": 17, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "steps": [{"color":"green","value":null},{"color":"red","value":0.01}] } }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"credits-api\",code=~\"5..\"}[1m]))", "legendFormat": "credits-api" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"risk-api\",code=~\"5..\"}[1m]))", "legendFormat": "risk-api" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"audit-api\",code=~\"5..\"}[1m]))", "legendFormat": "audit-api" },
+        { "datasource": "Prometheus", "expr": "sum(rate(http_requests_received_total{job=\"gateway\",code=~\"5..\"}[1m]))", "legendFormat": "gateway" }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Batch — Active Jobs & Queue",
+      "gridPos": { "x": 12, "y": 17, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "http_requests_in_flight{job=\"batch-processor\"}",
+          "legendFormat": "In-Flight"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Gateway Rate-Limited Requests",
+      "gridPos": { "x": 0, "y": 24, "w": 8, "h": 4 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":5},{"color":"red","value":20}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(rate(http_requests_received_total{job=\"gateway\",code=\"429\"}[5m])) * 60",
+        "legendFormat": "429/min"
+      }]
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Gateway Avg Latency (ms)",
+      "gridPos": { "x": 8, "y": 24, "w": 8, "h": 4 },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"gateway\"}[5m])) by (le)) * 1000",
+        "legendFormat": "p95 gateway"
+      }]
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Total HTTP Requests (last 1h)",
+      "gridPos": { "x": 16, "y": 24, "w": 8, "h": 4 },
+      "options": { "colorMode": "value", "graphMode": "none" },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(increase(http_requests_received_total[1h]))",
+        "legendFormat": "total"
+      }]
+    }
+  ]
+}

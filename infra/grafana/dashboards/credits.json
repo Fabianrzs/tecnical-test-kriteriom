@@ -1,0 +1,163 @@
+{
+  "uid": "kriteriom-credits",
+  "title": "Credits Service",
+  "tags": ["kriteriom", "credits"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Request Rate (req/s)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(rate(http_requests_received_total{job=\"credits-api\"}[1m]))",
+        "legendFormat": "req/s"
+      }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error Rate (%)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "background", "graphMode": "area",
+        "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":1},{"color":"red","value":5}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "100 * sum(rate(http_requests_received_total{job=\"credits-api\",code=~\"5..\"}[1m])) / sum(rate(http_requests_received_total{job=\"credits-api\"}[1m]))",
+        "legendFormat": "error %"
+      }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "P99 Latency (ms)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "background",
+        "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":200},{"color":"red","value":500}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"credits-api\"}[5m])) by (le)) * 1000",
+        "legendFormat": "p99 ms"
+      }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "In-Flight Requests",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(http_requests_in_flight{job=\"credits-api\"})",
+        "legendFormat": "in-flight"
+      }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "HTTP Request Rate by Endpoint",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum by (controller, action, method) (rate(http_requests_received_total{job=\"credits-api\"}[1m]))",
+        "legendFormat": "{{method}} {{controller}}/{{action}}"
+      }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Latency Percentiles (ms)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"credits-api\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p50"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"credits-api\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p95"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"credits-api\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "HTTP Errors (4xx / 5xx)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_received_total{job=\"credits-api\",code=~\"4..\"}[1m]))",
+          "legendFormat": "4xx"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_received_total{job=\"credits-api\",code=~\"5..\"}[1m]))",
+          "legendFormat": "5xx"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Outbox — Pending Messages",
+      "description": "Messages waiting to be published to RabbitMQ",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "outbox_pending_messages_total{job=\"credits-api\"}",
+        "legendFormat": "pending outbox"
+      }]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "GC / Memory",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "process_working_set_bytes{job=\"credits-api\"} / 1024 / 1024",
+          "legendFormat": "Working Set (MB)"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "dotnet_total_memory_bytes{job=\"credits-api\"} / 1024 / 1024",
+          "legendFormat": "GC Heap (MB)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Thread Pool",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "dotnet_threadpool_threads_total{job=\"credits-api\"}",
+          "legendFormat": "Pool Threads"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "dotnet_threadpool_queue_length{job=\"credits-api\"}",
+          "legendFormat": "Queue Length"
+        }
+      ]
+    }
+  ]
+}

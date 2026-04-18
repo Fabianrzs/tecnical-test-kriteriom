@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'credits-api'
+    static_configs:
+      - targets: ['credits-api:5001']
+    metrics_path: '/metrics'
+
+  - job_name: 'risk-api'
+    static_configs:
+      - targets: ['risk-api:5002']
+    metrics_path: '/metrics'
+
+  - job_name: 'audit-api'
+    static_configs:
+      - targets: ['audit-api:5003']
+    metrics_path: '/metrics'
+
+  - job_name: 'notifications-api'
+    static_configs:
+      - targets: ['notifications-api:5004']
+    metrics_path: '/metrics'
+
+  - job_name: 'batch-processor'
+    static_configs:
+      - targets: ['batch-processor:5005']
+    metrics_path: '/metrics'
+
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['gateway:5000']
+    metrics_path: '/metrics'

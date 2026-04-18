@@ -1,0 +1,122 @@
+{
+  "uid": "kriteriom-audit",
+  "title": "Audit Trail & Distributed Traces",
+  "tags": ["kriteriom", "audit", "traces"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Audit Events / min",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(rate(http_requests_received_total{job=\"audit-api\",code=\"200\"}[1m])) * 60",
+        "legendFormat": "events/min"
+      }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Audit API P99 Latency (ms)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "options": {
+        "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":100},{"color":"red","value":300}] }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"audit-api\"}[5m])) by (le)) * 1000",
+        "legendFormat": "p99 ms"
+      }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Risk Events Processed / min",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "background" },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(rate(http_requests_received_total{job=\"risk-api\",code=\"200\"}[1m])) * 60",
+        "legendFormat": "risk events/min"
+      }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Notifications / min",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "options": { "colorMode": "background" },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(rate(http_requests_received_total{job=\"notifications-api\",code=\"200\"}[1m])) * 60",
+        "legendFormat": "notifs/min"
+      }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Event Flow: Credits → Risk → Audit → Notifications",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_received_total{job=\"credits-api\",method=\"POST\",code=\"201\"}[1m])) * 60",
+          "legendFormat": "Credits Created"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_received_total{job=\"risk-api\"}[1m])) * 60",
+          "legendFormat": "Risk Processed"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_received_total{job=\"audit-api\"}[1m])) * 60",
+          "legendFormat": "Audit Recorded"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_received_total{job=\"notifications-api\"}[1m])) * 60",
+          "legendFormat": "Notifications Sent"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Audit API — Request Rate by Status Code",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum by (code) (rate(http_requests_received_total{job=\"audit-api\"}[1m]))",
+        "legendFormat": "HTTP {{code}}"
+      }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Risk API — Request Rate",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum by (code) (rate(http_requests_received_total{job=\"risk-api\"}[1m]))",
+        "legendFormat": "HTTP {{code}}"
+      }]
+    },
+    {
+      "id": 8,
+      "type": "text",
+      "title": "Distributed Traces — Jaeger",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 4 },
+      "options": {
+        "mode": "markdown",
+        "content": "## Distributed Traces\n\nOpen **[Jaeger UI](http://localhost:16686)** to explore full request traces across services.\n\n**Services instrumented:** `api-gateway` · `credits-api` · `risk-api` · `audit-api` · `batch-processor`\n\nAll traces include `X-Correlation-Id` for end-to-end request correlation."
+      }
+    }
+  ]
+}
