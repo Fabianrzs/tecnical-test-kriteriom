@@ -4,22 +4,13 @@ using Hangfire.PostgreSql;
 using Kriteriom.BatchProcessor.Dashboard;
 using Kriteriom.BatchProcessor.Jobs;
 using Kriteriom.BatchProcessor.Persistence;
+using Kriteriom.SharedKernel.Extensions;
 using Kriteriom.SharedKernel.Vault;
-using MassTransit;
 using Microsoft.Extensions.Http.Resilience;
-using Microsoft.EntityFrameworkCore;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Polly;
-using Prometheus;
 using Serilog;
-using Serilog.Events;
 
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .CreateBootstrapLogger();
+SerilogExtensions.ConfigureBootstrapLogger();
 
 try
 {
@@ -28,35 +19,22 @@ try
     var builder = WebApplication.CreateBuilder(args);
     builder.AddVaultSecrets("secret/batch");
 
-    builder.Host.UseSerilog((context, services, configuration) =>
-    {
-        configuration
-            .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services)
-            .Enrich.FromLogContext()
-            .Enrich.WithMachineName()
-            .Enrich.WithEnvironmentName()
-            .WriteTo.Console(outputTemplate:
-                "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
-    });
+    builder.Host.AddServiceSerilog(enrichWithMachineInfo: true);
 
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("DefaultConnection is required.");
-
-    builder.Services.AddDbContext<BatchDbContext>(options =>
-        options.UseNpgsql(connectionString,
-            npgsql => npgsql.MigrationsHistoryTable("__batch_ef_migrations_history")));
+    builder.Services.AddServiceDatabase<BatchDbContext>(builder.Configuration, npgsqlOptions: npgsql =>
+        npgsql.MigrationsHistoryTable("__batch_ef_migrations_history"));
 
     builder.Services.AddHangfire(config => config
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
-        .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
+        .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(
+            builder.Configuration.GetConnectionString("DefaultConnection"))));
 
     builder.Services.AddHangfireServer(options =>
     {
         options.WorkerCount = 4;
-        options.Queues = new[] { "batch", "seed", "default" };
+        options.Queues = ["batch", "seed", "default"];
     });
 
     var creditsBaseUrl = builder.Configuration["CreditsApiBaseUrl"] ?? "http://credits-api:5001";
@@ -92,7 +70,7 @@ try
                 Log.Warning("Credits API circuit breaker OPEN for {Duration}s", args.BreakDuration.TotalSeconds);
                 return default;
             },
-            OnClosed = args =>
+            OnClosed = _ =>
             {
                 Log.Information("Credits API circuit breaker CLOSED");
                 return default;
@@ -100,35 +78,9 @@ try
         });
     });
 
-    builder.Services.AddMassTransit(x =>
-    {
-        x.UsingRabbitMq((context, cfg) =>
-        {
-            cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq", h =>
-            {
-                h.Username(builder.Configuration["RabbitMQ:Username"] ?? "admin");
-                h.Password(builder.Configuration["RabbitMQ:Password"] ?? "admin123");
-            });
+    builder.Services.AddServiceRabbitMq(builder.Configuration, useStandardRetry: false);
 
-            cfg.ConfigureEndpoints(context);
-        });
-    });
-
-    builder.Services.AddOpenTelemetry()
-        .WithTracing(tracing =>
-        {
-            tracing
-                .SetResourceBuilder(ResourceBuilder.CreateDefault()
-                    .AddService("batch-processor", serviceVersion: "1.0.0"))
-                .AddAspNetCoreInstrumentation(opts => opts.RecordException = true)
-                .AddHttpClientInstrumentation()
-                .AddEntityFrameworkCoreInstrumentation(opts => opts.SetDbStatementForText = true)
-                .AddJaegerExporter(opts =>
-                {
-                    opts.AgentHost = builder.Configuration["Jaeger:Host"] ?? "localhost";
-                    opts.AgentPort = int.Parse(builder.Configuration["Jaeger:Port"] ?? "6831");
-                });
-        });
+    builder.Services.AddServiceTelemetry(builder.Configuration, "batch-processor", includeEfCore: true);
 
     builder.Services.AddTransient<CreditStatusRecalculationJob>();
     builder.Services.AddScoped<Kriteriom.BatchProcessor.Services.IBatchStatusService,
@@ -136,56 +88,21 @@ try
     builder.Services.AddTransient<SeedTestDataJob>();
 
     builder.Services.AddControllers();
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(c =>
-    {
-        c.SwaggerDoc("v1", new()
-        {
-            Title = "Kriteriom Batch Processor",
-            Version = "v1",
-            Description = "Batch processing service with Hangfire for credit status recalculation"
-        });
-    });
+    builder.Services.AddServiceSwagger("Kriteriom Batch Processor",
+        "Batch processing service with Hangfire for credit status recalculation");
 
     builder.Services.AddHealthChecks()
         .AddDbContextCheck<BatchDbContext>("batch-database");
 
     var app = builder.Build();
 
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<BatchDbContext>();
-        var startLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        try
-        {
-            startLogger.LogInformation("Applying batch database migrations…");
-            await dbContext.Database.MigrateAsync();
-            startLogger.LogInformation("Batch database migrations applied successfully.");
-        }
-        catch (Exception ex)
-        {
-            startLogger.LogError(ex, "Error applying batch database migrations");
-            throw;
-        }
-    }
+    await app.RunMigrationsAsync<BatchDbContext>();
 
     app.UseSerilogRequestLogging(opts =>
-    {
-        opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
-    });
-    
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Batch Processor v1");
-        c.RoutePrefix = "swagger";
-    });
+        opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms");
 
-    app.UseMetricServer();
-    app.UseHttpMetrics(options =>
-    {
-        options.AddCustomLabel("service", _ => "batch-processor");
-    });
+    app.UseServiceSwagger("Batch Processor");
+    app.UseServiceMetrics("batch-processor");
 
     app.UseRouting();
 
@@ -218,4 +135,3 @@ finally
 }
 
 return 0;
-

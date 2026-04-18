@@ -6,19 +6,19 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Kriteriom.Audit.Infrastructure/Kriteriom.Audit.Infrastructure.csproj" />
-    <ProjectReference Include="../../../SharedKernel/Kriteriom.SharedKernel/Kriteriom.SharedKernel.csproj" />
-    <PackageReference Include="MassTransit" Version="8.3.6" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.6" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
-    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.Jaeger" Version="1.5.1" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="8.0.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
+    <ProjectReference Include="../../../SharedKernel/Kriteriom.SharedKernel.Infrastructure/Kriteriom.SharedKernel.Infrastructure.csproj" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="MassTransit.RabbitMQ" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="prometheus-net.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
