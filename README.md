@@ -94,7 +94,7 @@ docker compose ps
 
 | Recurso | URL |
 |---|---|
-| Frontend | http://localhost:3001 |
+| Frontend | http://localhost:3000 |
 | API Gateway | http://localhost:8080 |
 | Credits API — Swagger | http://localhost:5001/swagger |
 | Audit API — Swagger | http://localhost:5003/swagger |
