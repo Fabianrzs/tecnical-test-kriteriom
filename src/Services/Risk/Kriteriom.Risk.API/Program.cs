@@ -16,7 +16,10 @@ try
     builder.Host.AddServiceSerilog();
 
     builder.Services.AddServiceRabbitMq(builder.Configuration, x =>
-        x.AddConsumer<CreditCreatedConsumer>());
+    {
+        x.AddConsumer<CreditCreatedConsumer>();
+        x.AddConsumer<CreditRiskEvaluationRequestedConsumer>();
+    });
 
     var creditsBaseUrl = builder.Configuration["CreditsApiBaseUrl"] ?? "http://credits-api:5001";
 

@@ -116,6 +116,13 @@ public class CreditStatusRecalculationJob(
                     {
                         try
                         {
+                            // Re-trigger risk evaluation for Pending credits with no risk score
+                            if (credit.Status == "Pending" && !credit.RiskScore.HasValue)
+                            {
+                                await TriggerRiskEvaluationAsync(credit, httpClient, bus, logger, innerCt);
+                                return;
+                            }
+
                             var (newStatus, reason) = DetermineNewStatus(credit);
                             if (newStatus is null)
                                 return;
@@ -281,6 +288,50 @@ public class CreditStatusRecalculationJob(
         "Defaulted" => 5,
         _ => 0
     };
+
+    private static async Task TriggerRiskEvaluationAsync(
+        CreditApiDto credit,
+        HttpClient httpClient,
+        IBus bus,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var client = await httpClient.GetFromJsonAsync<ClientApiDto>(
+                $"/api/clients/{credit.ClientId}", ct);
+
+            if (client is null)
+            {
+                logger.LogWarning("Client {ClientId} not found for credit {CreditId}", credit.ClientId, credit.Id);
+                return;
+            }
+
+            var financial = await httpClient.GetFromJsonAsync<ClientFinancialDto>(
+                $"/api/clients/{credit.ClientId}/financial-summary", ct);
+
+            await bus.Publish(new CreditRiskEvaluationRequestedEvent
+            {
+                CreditId            = credit.Id,
+                ClientId            = credit.ClientId,
+                Amount              = credit.Amount,
+                Status              = credit.Status,
+                InterestRate        = credit.InterestRate,
+                TermMonths          = credit.TermMonths,
+                MonthlyIncome       = client.MonthlyIncome,
+                ExistingMonthlyDebt = financial?.ExistingMonthlyDebt ?? 0,
+                ClientCreditScore   = client.CreditScore
+            }, ct);
+
+            logger.LogInformation(
+                "Re-triggered risk evaluation for credit {CreditId} (client={ClientId}, score={Score})",
+                credit.Id, credit.ClientId, client.CreditScore);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to trigger risk evaluation for credit {CreditId}", credit.Id);
+        }
+    }
 }
 
 // ─── Local DTOs for Credits API responses ───────────────────────────────────
@@ -317,10 +368,10 @@ internal class CreditApiDto
     [JsonPropertyName("interestRate")]
     public decimal InterestRate { get; init; }
 
-    [JsonPropertyName("status")]
-    public int StatusCode { get; init; }
+    [JsonPropertyName("termMonths")]
+    public int TermMonths { get; init; }
 
-    [JsonPropertyName("statusName")]
+    [JsonPropertyName("status")]
     public string Status { get; init; } = string.Empty;
 
     [JsonPropertyName("createdAt")]
@@ -334,4 +385,22 @@ internal class CreditApiDto
 
     [JsonPropertyName("isHighRisk")]
     public bool IsHighRisk { get; init; }
+}
+
+internal class ClientApiDto
+{
+    [JsonPropertyName("id")]
+    public Guid Id { get; init; }
+
+    [JsonPropertyName("monthlyIncome")]
+    public decimal MonthlyIncome { get; init; }
+
+    [JsonPropertyName("creditScore")]
+    public int CreditScore { get; init; }
+}
+
+internal class ClientFinancialDto
+{
+    [JsonPropertyName("existingMonthlyDebt")]
+    public decimal ExistingMonthlyDebt { get; init; }
 }

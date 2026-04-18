@@ -39,7 +39,7 @@ public static class RiskCalculator
                 creditId, 99m, "Rejected", $"Puntaje de crédito fuera de rango ({creditScore})"));
 
         var monthlyRate = annualInterestRate / 12m;
-        decimal newPayment = monthlyRate == 0
+        var newPayment = monthlyRate == 0
             ? amount / termMonths
             : amount * monthlyRate / (1m - (decimal)Math.Pow((double)(1m + monthlyRate), -termMonths));
 
@@ -67,9 +67,9 @@ public static class RiskCalculator
     private static (decimal score, string decision, string reason) DetermineOutcome(
         decimal newDti, decimal totalDti, int creditScore)
     {
-        bool highDti   = newDti > 60m;
-        bool mediumDti = newDti is >= 30m and <= 60m;
-        bool lowDti    = newDti < 30m;
+        var highDti   = newDti > 60m;
+        var mediumDti = newDti is >= 30m and <= 60m;
+        var lowDti    = newDti < 30m;
 
         bool goodScore = creditScore >= 650;
         bool fairScore = creditScore is >= 500 and < 650;

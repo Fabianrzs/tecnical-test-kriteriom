@@ -5,6 +5,7 @@ using Kriteriom.BatchProcessor.Dashboard;
 using Kriteriom.BatchProcessor.Jobs;
 using Kriteriom.BatchProcessor.Persistence;
 using Kriteriom.SharedKernel.Extensions;
+using Kriteriom.SharedKernel.Middleware;
 using Kriteriom.SharedKernel.Vault;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;

@@ -11,6 +11,7 @@ volumes:
   grafana_data:
 
 services:
+
   postgres:
     image: postgres:16-alpine
     container_name: credits-postgres
@@ -186,11 +187,14 @@ services:
       RabbitMQ__Username: ${RABBITMQ_USER}
       RabbitMQ__Password: ${RABBITMQ_PASS}
       Jaeger__Host: jaeger
+      CreditsApi__BaseUrl: "http://credits-api:5001"
     depends_on:
       rabbitmq:
         condition: service_healthy
       redis:
         condition: service_healthy
+      credits-api:
+        condition: service_started
     networks:
       - credit-network
 
@@ -242,41 +246,31 @@ services:
     networks:
       - credit-network
 
-  workers:
+  batch-processor:
     build:
       context: .
-      dockerfile: src/Workers/Kriteriom.Workers/Dockerfile
-    container_name: workers
+      dockerfile: src/Services/BatchProcessor/Dockerfile
+    container_name: batch-processor
+    ports:
+      - "5005:5005"
     environment:
-      DOTNET_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=credits_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-      ConnectionStrings__NotificationsConnection: "Host=postgres;Port=5432;Database=notifications_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-      ConnectionStrings__Redis: "redis:6379"
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://+:5005"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=batch_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       RabbitMQ__Host: rabbitmq
       RabbitMQ__Username: ${RABBITMQ_USER}
       RabbitMQ__Password: ${RABBITMQ_PASS}
-      Workers__Credits__IntervalHours: "24"
-      Workers__Notifications__RetryIntervalMinutes: "5"
-      FeatureFlags__SeedTestData: "false"
+      Jaeger__Host: jaeger
+      CreditsApi__BaseUrl: "http://credits-api:5001"
+      Hangfire__User: "admin"
+      Hangfire__Password: "Hangf1r3@2026"
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - credit-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - gateway
+      credits-api:
+        condition: service_started
     networks:
       - credit-network
 
@@ -291,10 +285,25 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5000"
       Jaeger__Host: jaeger
+      ReverseProxy__Clusters__credits__Destinations__default__Address: "http://credits-api:5001"
+      ReverseProxy__Clusters__audit__Destinations__default__Address: "http://audit-api:5003"
+      ReverseProxy__Clusters__batch__Destinations__default__Address: "http://batch-processor:5005"
     depends_on:
       - credits-api
-      - risk-api
       - audit-api
       - notifications-api
+      - batch-processor
+    networks:
+      - credit-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3001:80"
+    depends_on:
+      - gateway
     networks:
       - credit-network

@@ -5,7 +5,7 @@ using MediatR;
 
 namespace Kriteriom.Credits.API.Consumers;
 
-public abstract class RecalculateCreditStatusesConsumer(
+public class RecalculateCreditStatusesConsumer(
     IMediator mediator,
     ILogger<RecalculateCreditStatusesConsumer> logger)
     : IConsumer<RecalculateCreditStatusesRequestedEvent>

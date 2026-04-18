@@ -4,17 +4,29 @@ EXPOSE 5000
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY ["src/Gateway/Kriteriom.Gateway/Kriteriom.Gateway.csproj", "src/Gateway/Kriteriom.Gateway/"]
-COPY ["src/SharedKernel/Kriteriom.SharedKernel/Kriteriom.SharedKernel.csproj", "src/SharedKernel/Kriteriom.SharedKernel/"]
-RUN dotnet restore "src/Gateway/Kriteriom.Gateway/Kriteriom.Gateway.csproj"
-COPY . .
-WORKDIR "/src/src/Gateway/Kriteriom.Gateway"
-RUN dotnet build "Kriteriom.Gateway.csproj" -c Release -o /app/build
 
-FROM build AS publish
-RUN dotnet publish "Kriteriom.Gateway.csproj" -c Release -o /app/publish --no-restore
+COPY Directory.Packages.props Directory.Packages.props
+
+COPY src/SharedKernel/Kriteriom.SharedKernel.Domain/Kriteriom.SharedKernel.Domain.csproj             src/SharedKernel/Kriteriom.SharedKernel.Domain/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Contracts/Kriteriom.SharedKernel.Contracts.csproj       src/SharedKernel/Kriteriom.SharedKernel.Contracts/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Application/Kriteriom.SharedKernel.Application.csproj   src/SharedKernel/Kriteriom.SharedKernel.Application/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/Kriteriom.SharedKernel.Infrastructure.csproj src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/
+
+COPY src/Gateway/Kriteriom.Gateway/Kriteriom.Gateway.csproj src/Gateway/Kriteriom.Gateway/
+
+RUN dotnet restore src/Gateway/Kriteriom.Gateway/Kriteriom.Gateway.csproj
+
+COPY src/SharedKernel/Kriteriom.SharedKernel.Domain/        src/SharedKernel/Kriteriom.SharedKernel.Domain/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Contracts/      src/SharedKernel/Kriteriom.SharedKernel.Contracts/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Application/    src/SharedKernel/Kriteriom.SharedKernel.Application/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/ src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/
+
+COPY src/Gateway/Kriteriom.Gateway/ src/Gateway/Kriteriom.Gateway/
+
+RUN dotnet publish src/Gateway/Kriteriom.Gateway/Kriteriom.Gateway.csproj \
+    -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Kriteriom.Gateway.dll"]

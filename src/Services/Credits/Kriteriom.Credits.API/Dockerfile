@@ -4,20 +4,35 @@ EXPOSE 5001
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY ["src/Services/Credits/Kriteriom.Credits.API/Kriteriom.Credits.API.csproj", "src/Services/Credits/Kriteriom.Credits.API/"]
-COPY ["src/Services/Credits/Kriteriom.Credits.Application/Kriteriom.Credits.Application.csproj", "src/Services/Credits/Kriteriom.Credits.Application/"]
-COPY ["src/Services/Credits/Kriteriom.Credits.Domain/Kriteriom.Credits.Domain.csproj", "src/Services/Credits/Kriteriom.Credits.Domain/"]
-COPY ["src/Services/Credits/Kriteriom.Credits.Infrastructure/Kriteriom.Credits.Infrastructure.csproj", "src/Services/Credits/Kriteriom.Credits.Infrastructure/"]
-COPY ["src/SharedKernel/Kriteriom.SharedKernel/Kriteriom.SharedKernel.csproj", "src/SharedKernel/Kriteriom.SharedKernel/"]
-RUN dotnet restore "src/Services/Credits/Kriteriom.Credits.API/Kriteriom.Credits.API.csproj"
-COPY . .
-WORKDIR "/src/src/Services/Credits/Kriteriom.Credits.API"
-RUN dotnet build "Kriteriom.Credits.API.csproj" -c Release -o /app/build
 
-FROM build AS publish
-RUN dotnet publish "Kriteriom.Credits.API.csproj" -c Release -o /app/publish --no-restore
+COPY Directory.Packages.props Directory.Packages.props
+
+COPY src/SharedKernel/Kriteriom.SharedKernel.Domain/Kriteriom.SharedKernel.Domain.csproj             src/SharedKernel/Kriteriom.SharedKernel.Domain/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Contracts/Kriteriom.SharedKernel.Contracts.csproj       src/SharedKernel/Kriteriom.SharedKernel.Contracts/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Application/Kriteriom.SharedKernel.Application.csproj   src/SharedKernel/Kriteriom.SharedKernel.Application/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/Kriteriom.SharedKernel.Infrastructure.csproj src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/
+
+COPY src/Services/Credits/Kriteriom.Credits.Domain/Kriteriom.Credits.Domain.csproj                   src/Services/Credits/Kriteriom.Credits.Domain/
+COPY src/Services/Credits/Kriteriom.Credits.Application/Kriteriom.Credits.Application.csproj         src/Services/Credits/Kriteriom.Credits.Application/
+COPY src/Services/Credits/Kriteriom.Credits.Infrastructure/Kriteriom.Credits.Infrastructure.csproj   src/Services/Credits/Kriteriom.Credits.Infrastructure/
+COPY src/Services/Credits/Kriteriom.Credits.API/Kriteriom.Credits.API.csproj                         src/Services/Credits/Kriteriom.Credits.API/
+
+RUN dotnet restore src/Services/Credits/Kriteriom.Credits.API/Kriteriom.Credits.API.csproj
+
+COPY src/SharedKernel/Kriteriom.SharedKernel.Domain/        src/SharedKernel/Kriteriom.SharedKernel.Domain/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Contracts/      src/SharedKernel/Kriteriom.SharedKernel.Contracts/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Application/    src/SharedKernel/Kriteriom.SharedKernel.Application/
+COPY src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/ src/SharedKernel/Kriteriom.SharedKernel.Infrastructure/
+
+COPY src/Services/Credits/Kriteriom.Credits.Domain/          src/Services/Credits/Kriteriom.Credits.Domain/
+COPY src/Services/Credits/Kriteriom.Credits.Application/     src/Services/Credits/Kriteriom.Credits.Application/
+COPY src/Services/Credits/Kriteriom.Credits.Infrastructure/  src/Services/Credits/Kriteriom.Credits.Infrastructure/
+COPY src/Services/Credits/Kriteriom.Credits.API/             src/Services/Credits/Kriteriom.Credits.API/
+
+RUN dotnet publish src/Services/Credits/Kriteriom.Credits.API/Kriteriom.Credits.API.csproj \
+    -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Kriteriom.Credits.API.dll"]

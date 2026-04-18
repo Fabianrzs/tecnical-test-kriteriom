@@ -34,11 +34,11 @@ public class Credit : AggregateRoot
     {
         if (amount <= 0)
             throw new InvalidCreditOperationException("El monto debe ser mayor a cero");
-        if (interestRate < 0 || interestRate > 1)
+        if (interestRate is < 0 or > 1)
             throw new InvalidCreditOperationException("La tasa de interés debe estar entre 0 y 1");
         if (clientId == Guid.Empty)
             throw new InvalidCreditOperationException("El identificador del cliente es inválido");
-        if (termMonths < 6 || termMonths > 120)
+        if (termMonths is < 6 or > 120)
             throw new InvalidCreditOperationException("El plazo debe estar entre 6 y 120 meses");
 
         var credit = new Credit
@@ -71,7 +71,7 @@ public class Credit : AggregateRoot
 
     public void AssignRiskScore(decimal score, RiskDecision decision)
     {
-        if (score < 0 || score > 100)
+        if (score is < 0 or > 100)
             throw new InvalidCreditOperationException("El puntaje de riesgo debe estar entre 0 y 100");
 
         RiskScore = score;
@@ -80,7 +80,6 @@ public class Credit : AggregateRoot
         {
             RiskDecision.Approved    => CreditStatus.Active,
             RiskDecision.Rejected    => CreditStatus.Rejected,
-            RiskDecision.UnderReview => CreditStatus.UnderReview,
             _                        => CreditStatus.UnderReview
         };
 

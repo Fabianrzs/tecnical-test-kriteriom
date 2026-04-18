@@ -6,6 +6,8 @@ namespace Kriteriom.Credits.Domain.Aggregates;
 
 public class Client : AggregateRoot
 {
+    private const int BasePoints = 300;
+
     public string FullName        { get; private set; } = string.Empty;
     public string Email           { get; private set; } = string.Empty;
     public string DocumentNumber  { get; private set; } = string.Empty;
@@ -41,10 +43,10 @@ public class Client : AggregateRoot
             MonthlyIncome    = monthlyIncome,
             EmploymentStatus = employmentStatus,
             CreatedAt        = DateTime.UtcNow,
-            UpdatedAt        = DateTime.UtcNow
+            UpdatedAt        = DateTime.UtcNow,
+            CreditScore = CalculateScore(monthlyIncome, employmentStatus)
         };
 
-        client.CreditScore = CalculateScore(monthlyIncome, employmentStatus);
         return client;
     }
 
@@ -89,7 +91,7 @@ public class Client : AggregateRoot
         if (MonthlyIncome <= 0) return;
         var dti = monthlyPayment / MonthlyIncome * 100m;
 
-        int penalty = dti switch
+        var penalty = dti switch
         {
             < 20m  => 30,
             < 35m  => 55,
@@ -97,13 +99,13 @@ public class Client : AggregateRoot
             _      => 110
         };
 
-        CreditScore = Math.Max(300, CreditScore - penalty);
+        CreditScore = Math.Max(BasePoints, CreditScore - penalty);
         UpdatedAt   = DateTime.UtcNow;
     }
 
     public static int CalculateScore(decimal monthlyIncome, EmploymentStatus employment)
     {
-        int incomePoints = monthlyIncome switch
+        var incomePoints = monthlyIncome switch
         {
             > 10_000_000m => 350,
             > 5_000_000m  => 280,
@@ -112,15 +114,14 @@ public class Client : AggregateRoot
             _             => 50
         };
 
-        int employmentPoints = employment switch
+        var employmentPoints = employment switch
         {
             EmploymentStatus.Employed     => 200,
             EmploymentStatus.SelfEmployed => 160,
             EmploymentStatus.Retired      => 130,
-            EmploymentStatus.Unemployed   => 50,
             _                             => 50
         };
 
-        return 300 + incomePoints + employmentPoints;
+        return BasePoints + incomePoints + employmentPoints;
     }
 }
