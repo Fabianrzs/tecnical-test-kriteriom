@@ -8,7 +8,7 @@ namespace Kriteriom.Credits.Infrastructure.Persistence.Repositories;
 public class ClientRepository(CreditsDbContext context, ILogger<ClientRepository> logger) : IClientRepository
 {
     public async Task<Client?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => await context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+        => await context.Clients.FirstOrDefaultAsync(c => c.Id == id, ct);
 
     public async Task<Client?> GetByEmailAsync(string email, CancellationToken ct = default)
         => await context.Clients.AsNoTracking()
@@ -32,15 +32,12 @@ public class ClientRepository(CreditsDbContext context, ILogger<ClientRepository
     }
 
     public async Task AddAsync(Client client, CancellationToken ct = default)
-    {
-        await context.Clients.AddAsync(client, ct);
-        await context.SaveChangesAsync(ct);
-    }
+        => await context.Clients.AddAsync(client, ct);
 
-    public async Task UpdateAsync(Client client, CancellationToken ct = default)
+    public Task UpdateAsync(Client client, CancellationToken ct = default)
     {
         context.Clients.Update(client);
-        await context.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
     public async Task<int> GetTotalCountAsync(CancellationToken ct = default)

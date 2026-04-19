@@ -2,6 +2,11 @@ namespace Kriteriom.Risk.Domain.Domain;
 
 public static class RiskCalculator
 {
+    private const decimal MaxTotalDtiPercent  = 60m;
+    private const decimal MaxNewDtiPercent    = 60m;
+    private const decimal MediumDtiThreshold  = 30m;
+    private const int     GoodCreditScore     = 650;
+    private const int     FairCreditScoreMin  = 500;
     /// <summary>
     /// Evaluates credit risk using:
     ///   - New credit DTI (this payment / income)
@@ -38,6 +43,10 @@ public static class RiskCalculator
             return Task.FromResult(new RiskAssessmentResult(
                 creditId, 99m, "Rejected", $"Puntaje de crédito fuera de rango ({creditScore})"));
 
+        if (annualInterestRate is < 0 or > 1)
+            return Task.FromResult(new RiskAssessmentResult(
+                creditId, 99m, "Rejected", $"Tasa de interés anual inválida ({annualInterestRate:P2}). Debe estar entre 0 y 1 (0%–100%)."));
+
         var monthlyRate = annualInterestRate / 12m;
         var newPayment = monthlyRate == 0
             ? amount / termMonths
@@ -46,8 +55,8 @@ public static class RiskCalculator
         var newDti   = newPayment / monthlyIncome * 100m;
         var totalDti = (existingMonthlyDebt + newPayment) / monthlyIncome * 100m;
 
-        // Hard cap: accumulated debt load must not exceed 60% of income
-        if (totalDti > 60m)
+        // Hard cap: accumulated debt load must not exceed MaxTotalDtiPercent of income
+        if (totalDti > MaxTotalDtiPercent)
         {
             var score = Math.Min(Math.Round(totalDti * 1.1m + 20m, 2), 99m);
             return Task.FromResult(new RiskAssessmentResult(
@@ -67,13 +76,12 @@ public static class RiskCalculator
     private static (decimal score, string decision, string reason) DetermineOutcome(
         decimal newDti, decimal totalDti, int creditScore)
     {
-        var highDti   = newDti > 60m;
-        var mediumDti = newDti is >= 30m and <= 60m;
-        var lowDti    = newDti < 30m;
+        var highDti   = newDti > MaxNewDtiPercent;
+        var mediumDti = newDti is >= MediumDtiThreshold and <= MaxNewDtiPercent;
 
-        bool goodScore = creditScore >= 650;
-        bool fairScore = creditScore is >= 500 and < 650;
-        bool badScore  = creditScore < 500;
+        bool goodScore = creditScore >= GoodCreditScore;
+        bool fairScore = creditScore is >= FairCreditScoreMin and < GoodCreditScore;
+        bool badScore  = creditScore < FairCreditScoreMin;
 
         if (highDti || badScore)
         {

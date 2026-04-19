@@ -1,5 +1,6 @@
 using Kriteriom.Credits.Domain.Aggregates;
 using Kriteriom.Credits.Infrastructure.Persistence.Configurations;
+using Kriteriom.SharedKernel.Infrastructure.Persistence;
 using Kriteriom.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
 

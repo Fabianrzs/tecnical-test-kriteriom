@@ -20,5 +20,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="System.Text.Json" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <ProjectReference Include="..\..\..\SharedKernel\Kriteriom.SharedKernel.Infrastructure\Kriteriom.SharedKernel.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

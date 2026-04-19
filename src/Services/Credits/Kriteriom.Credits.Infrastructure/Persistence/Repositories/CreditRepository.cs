@@ -11,11 +11,7 @@ namespace Kriteriom.Credits.Infrastructure.Persistence.Repositories;
 public class CreditRepository(CreditsDbContext context, ILogger<CreditRepository> logger) : ICreditRepository
 {
     public async Task<Credit?> GetByIdAsync(Guid id, CancellationToken ct = default)
-    {
-        return await context.Credits
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == id, ct);
-    }
+        => await context.Credits.FirstOrDefaultAsync(c => c.Id == id, ct);
 
     public async Task<(IEnumerable<Credit> Items, int Total)> GetAllAsync(
         int page,
@@ -65,10 +61,10 @@ public class CreditRepository(CreditsDbContext context, ILogger<CreditRepository
     public async Task AddAsync(Credit credit, CancellationToken ct = default)
         => await context.Credits.AddAsync(credit, ct);
 
-    public async Task UpdateAsync(Credit credit, CancellationToken ct = default)
+    public Task UpdateAsync(Credit credit, CancellationToken ct = default)
     {
         context.Credits.Update(credit);
-        await context.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
     public async Task<IEnumerable<Credit>> GetForBatchProcessingAsync(

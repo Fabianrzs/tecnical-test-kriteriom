@@ -1,11 +1,17 @@
-using Kriteriom.Credits.Application.Services;
 using Kriteriom.Credits.Domain.Repositories;
-using Kriteriom.Credits.Infrastructure.Idempotency;
 using Kriteriom.Credits.Infrastructure.Messaging;
 using Kriteriom.Credits.Infrastructure.Persistence;
 using Kriteriom.Credits.Infrastructure.Persistence.Repositories;
 using Kriteriom.Credits.Infrastructure.Seeding;
+using Kriteriom.SharedKernel.Application.Services;
+using Kriteriom.SharedKernel.Contracts.Idempotency;
+using Kriteriom.SharedKernel.Infrastructure.Idempotency;
+using Kriteriom.SharedKernel.Infrastructure.Messaging;
+using Kriteriom.SharedKernel.Infrastructure.Persistence;
+using Kriteriom.SharedKernel.Messaging;
 using Kriteriom.SharedKernel.Outbox;
+using Microsoft.Extensions.Logging;
+using Polly.Registry;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -22,7 +28,7 @@ public static class ServiceExtensions
         IConfiguration config,
         Action<IBusRegistrationConfigurator>? configureConsumers = null)
     {
-        services.AddDbContext<CreditsDbContext>(options =>
+        services.AddDbContext<CreditsDbContext>((sp, options) =>
         {
             options.UseNpgsql(
                 config.GetConnectionString("DefaultConnection"),
@@ -34,7 +40,14 @@ public static class ServiceExtensions
                         maxRetryDelay: TimeSpan.FromSeconds(30),
                         errorCodesToAdd: null);
                 });
+
+            options.AddInterceptors(sp.GetRequiredService<DomainEventsToOutboxInterceptor>());
         });
+
+        services.AddScoped<IDomainEventMapper, CreditsDomainEventMapper>();
+        services.AddScoped<DomainEventsToOutboxInterceptor>();
+
+        services.AddScoped<DbContext>(sp => sp.GetRequiredService<CreditsDbContext>());
 
         services.AddScoped<ICreditRepository, CreditRepository>();
         services.AddScoped<IClientRepository, ClientRepository>();
@@ -82,7 +95,21 @@ public static class ServiceExtensions
             });
         });
 
-        services.AddHostedService<OutboxProcessorService>();
+        
+        IReadOnlyDictionary<string, Type> eventTypeRegistry = new Dictionary<string, Type>
+        {
+            [nameof(CreditCreatedIntegrationEvent)] = typeof(CreditCreatedIntegrationEvent),
+            [nameof(CreditUpdatedIntegrationEvent)] = typeof(CreditUpdatedIntegrationEvent),
+            [nameof(RiskAssessedIntegrationEvent)]  = typeof(RiskAssessedIntegrationEvent),
+            [nameof(ClientCreatedIntegrationEvent)] = typeof(ClientCreatedIntegrationEvent),
+            [nameof(ClientUpdatedIntegrationEvent)] = typeof(ClientUpdatedIntegrationEvent),
+        };
+
+        services.AddHostedService(sp => new OutboxProcessorService(
+            eventTypeRegistry,
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<ResiliencePipelineProvider<string>>(),
+            sp.GetRequiredService<ILogger<OutboxProcessorService>>()));
 
         if (config.GetValue<bool>("FeatureFlags:SeedTestData"))
             services.AddHostedService<CreditsDataSeeder>();
