@@ -13,8 +13,8 @@ public class CreateCreditCommandValidator : AbstractValidator<CreateCreditComman
         RuleFor(x => x.Amount)
             .GreaterThan(0)
             .WithMessage("Amount must be greater than zero")
-            .LessThanOrEqualTo(10_000_000)
-            .WithMessage("Amount cannot exceed 10,000,000");
+            .LessThanOrEqualTo(100_000_000)
+            .WithMessage("Amount cannot exceed 100,000,000");
 
         RuleFor(x => x.InterestRate)
             .GreaterThanOrEqualTo(0)

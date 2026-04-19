@@ -1,8 +1,8 @@
-using Kriteriom.Credits.Application.Services;
 using Kriteriom.Credits.Domain.Aggregates;
 using Kriteriom.Credits.Domain.Enums;
 using Kriteriom.Credits.Domain.Exceptions;
 using Kriteriom.Credits.Domain.Repositories;
+using Kriteriom.SharedKernel.Application.Services;
 using Kriteriom.SharedKernel.Common;
 using MediatR;
 using Microsoft.Extensions.Logging;

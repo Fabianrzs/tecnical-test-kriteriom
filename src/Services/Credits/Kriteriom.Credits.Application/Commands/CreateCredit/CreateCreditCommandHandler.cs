@@ -1,13 +1,12 @@
 using System.Text.Json;
 using Kriteriom.Credits.Application.DTOs;
 using Kriteriom.Credits.Application.Mapping;
-using Kriteriom.Credits.Application.Services;
 using Kriteriom.Credits.Domain.Aggregates;
 using Kriteriom.Credits.Domain.Exceptions;
 using Kriteriom.Credits.Domain.Repositories;
+using Kriteriom.SharedKernel.Application.Services;
 using Kriteriom.SharedKernel.Common;
-using Kriteriom.SharedKernel.Messaging;
-using Kriteriom.SharedKernel.Outbox;
+using Kriteriom.SharedKernel.Contracts.Idempotency;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -16,9 +15,7 @@ namespace Kriteriom.Credits.Application.Commands.CreateCredit;
 public class CreateCreditCommandHandler(
     ICreditRepository creditRepository,
     IClientRepository clientRepository,
-    IOutboxRepository outboxRepository,
     IIdempotencyService idempotencyService,
-    IUnitOfWork unitOfWork,
     ILogger<CreateCreditCommandHandler> logger) : IRequestHandler<CreateCreditCommand, Result<CreditDto>>
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -29,11 +26,11 @@ public class CreateCreditCommandHandler(
 
     public async Task<Result<CreditDto>> Handle(CreateCreditCommand request, CancellationToken ct)
     {
-        var cachedResponse = await idempotencyService.GetAsync(request.IdempotencyKey, ct);
-        if (cachedResponse is not null)
+        var cachedJson = await idempotencyService.GetAsync(request.IdempotencyKey, ct);
+        if (cachedJson is not null)
         {
             logger.LogInformation("Idempotency hit for key {Key}", request.IdempotencyKey);
-            var cachedDto = JsonSerializer.Deserialize<CreditDto>(cachedResponse, JsonOptions);
+            var cachedDto = JsonSerializer.Deserialize<CreditDto>(cachedJson, JsonOptions);
             if (cachedDto is not null) return Result<CreditDto>.Success(cachedDto);
         }
 
@@ -41,62 +38,29 @@ public class CreateCreditCommandHandler(
         if (client is null)
             return Result<CreditDto>.Failure($"Cliente {request.ClientId} no encontrado", "CLIENT_NOT_FOUND");
 
-        var activeCredits = await creditRepository.GetActiveCreditsForClientAsync(request.ClientId, ct);
-        var activeList = activeCredits.ToList();
-
-        var existingMonthlyDebt = activeList.Sum(c => c.MonthlyPayment());
-        var newMonthlyPayment   = Credit.ComputeMonthlyPayment(request.Amount, request.InterestRate, request.TermMonths);
-        var projectedDti        = (existingMonthlyDebt + newMonthlyPayment) / client.MonthlyIncome * 100m;
-
-        if (projectedDti > 60m)
-            return Result<CreditDto>.Failure(
-                $"La suma de pagos mensuales proyectada ({projectedDti:F1}%) supera el límite del 60% de los ingresos.",
-                "DEBT_CAPACITY_EXCEEDED");
+        Credit? credit = null;
 
         try
         {
-            var credit = Credit.Create(request.ClientId, request.Amount, request.InterestRate, request.TermMonths);
+            var activeCredits        = await creditRepository.GetActiveCreditsForClientAsync(request.ClientId, ct);
+            var existingMonthlyDebt  = activeCredits.Sum(c => c.MonthlyPayment());
+            var newMonthlyPayment    = Credit.ComputeMonthlyPayment(request.Amount, request.InterestRate, request.TermMonths);
+            var projectedDti         = (existingMonthlyDebt + newMonthlyPayment) / client.MonthlyIncome * 100m;
 
-            var integrationEvent = new CreditCreatedIntegrationEvent
-            {
-                CreditId          = credit.Id,
-                ClientId          = credit.ClientId,
-                Amount            = credit.Amount,
-                Status            = credit.Status.ToString(),
-                InterestRate         = credit.InterestRate,
-                TermMonths           = credit.TermMonths,
-                MonthlyIncome        = client.MonthlyIncome,
-                ExistingMonthlyDebt  = existingMonthlyDebt,
-                ClientCreditScore = client.CreditScore,
-                CorrelationId     = request.IdempotencyKey
-            };
+            if (projectedDti > 60m)
+                throw new DebtCapacityExceededException(projectedDti);
 
-            var outboxMessage = new OutboxMessage
-            {
-                Id         = Guid.NewGuid(),
-                EventType  = nameof(CreditCreatedIntegrationEvent),
-                Payload    = JsonSerializer.Serialize(integrationEvent, JsonOptions),
-                CreatedAt  = DateTime.UtcNow,
-                RetryCount = 0
-            };
+            credit = Credit.Create(
+                request.ClientId, request.Amount, request.InterestRate, request.TermMonths,
+                monthlyIncome:       client.MonthlyIncome,
+                existingMonthlyDebt: existingMonthlyDebt,
+                clientCreditScore:   client.CreditScore);
 
-            await unitOfWork.ExecuteInTransactionAsync(async () =>
-            {
-                await creditRepository.AddAsync(credit, ct);
-                await outboxRepository.AddAsync(outboxMessage, ct);
-            }, ct);
-
-            var creditDto = credit.ToDto();
-            await idempotencyService.SetAsync(
-                request.IdempotencyKey,
-                JsonSerializer.Serialize(creditDto, JsonOptions),
-                null, ct);
-
-            logger.LogInformation(
-                "Credit {CreditId} created for client {ClientId} (income={Income}, score={Score})",
-                credit.Id, credit.ClientId, client.MonthlyIncome, client.CreditScore);
-
-            return Result<CreditDto>.Success(creditDto);
+            await creditRepository.AddAsync(credit, ct);
+        }
+        catch (DebtCapacityExceededException ex)
+        {
+            return Result<CreditDto>.Failure(ex.Message, "DEBT_CAPACITY_EXCEEDED");
         }
         catch (InvalidCreditOperationException ex)
         {
@@ -108,5 +72,19 @@ public class CreateCreditCommandHandler(
             logger.LogError(ex, "Unexpected error creating credit for client {ClientId}", request.ClientId);
             return Result<CreditDto>.Failure("An unexpected error occurred while creating the credit", "INTERNAL_ERROR");
         }
+
+        var creditDto = credit!.ToDto();
+
+        // Cache only after the transaction commits to avoid stale idempotency responses.
+        await idempotencyService.SetAsync(
+            request.IdempotencyKey,
+            JsonSerializer.Serialize(creditDto, JsonOptions),
+            null, ct);
+
+        logger.LogInformation(
+            "Credit {CreditId} created for client {ClientId} (income={Income}, score={Score})",
+            credit!.Id, credit.ClientId, client.MonthlyIncome, client.CreditScore);
+
+        return Result<CreditDto>.Success(creditDto);
     }
 }
