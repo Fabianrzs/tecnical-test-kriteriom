@@ -12,6 +12,7 @@
     <ProjectReference Include="../Kriteriom.SharedKernel.Contracts/Kriteriom.SharedKernel.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Polly.Core" />
     <PackageReference Include="VaultSharp" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.Console" />

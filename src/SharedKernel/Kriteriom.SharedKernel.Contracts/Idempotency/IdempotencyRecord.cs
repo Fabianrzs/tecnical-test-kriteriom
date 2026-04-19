@@ -1,4 +1,4 @@
-namespace Kriteriom.Credits.Infrastructure.Persistence;
+namespace Kriteriom.SharedKernel.Infrastructure.Persistence;
 
 public class IdempotencyRecord
 {

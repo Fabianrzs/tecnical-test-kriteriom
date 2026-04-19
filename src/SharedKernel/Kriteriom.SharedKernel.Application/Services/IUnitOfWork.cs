@@ -1,4 +1,4 @@
-namespace Kriteriom.Credits.Application.Services;
+namespace Kriteriom.SharedKernel.Application.Services;
 
 public interface IUnitOfWork
 {

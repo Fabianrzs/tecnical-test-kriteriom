@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Kriteriom.SharedKernel.Messaging;
 using Kriteriom.SharedKernel.Outbox;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,9 +7,10 @@ using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Registry;
 
-namespace Kriteriom.Credits.Infrastructure.Messaging;
+namespace Kriteriom.SharedKernel.Infrastructure.Messaging;
 
 public class OutboxProcessorService(
+    IReadOnlyDictionary<string, Type>  eventTypeRegistry,
     IServiceScopeFactory scopeFactory,
     ResiliencePipelineProvider<string> pipelineProvider,
     ILogger<OutboxProcessorService> logger)
@@ -52,7 +52,7 @@ public class OutboxProcessorService(
     {
         using var scope = scopeFactory.CreateScope();
         var outboxRepo = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
-        var bus = scope.ServiceProvider.GetRequiredService<IBus>();
+        var bus        = scope.ServiceProvider.GetRequiredService<IBus>();
 
         var pendingMessages = (await outboxRepo.GetPendingAsync(50, ct)).ToList();
 
@@ -66,7 +66,6 @@ public class OutboxProcessorService(
         foreach (var message in pendingMessages)
         {
             if (ct.IsCancellationRequested) break;
-
             await ProcessMessageWithRetryAsync(message, bus, outboxRepo, pipeline, ct);
         }
     }
@@ -105,34 +104,17 @@ public class OutboxProcessorService(
 
     private async Task PublishMessageAsync(OutboxMessage message, IBus bus, CancellationToken ct)
     {
-        switch (message.EventType)
+        if (!eventTypeRegistry.TryGetValue(message.EventType, out var eventType))
         {
-            case nameof(CreditCreatedIntegrationEvent):
-            {
-                var evt = JsonSerializer.Deserialize<CreditCreatedIntegrationEvent>(message.Payload, JsonOptions)
-                    ?? throw new InvalidOperationException($"Failed to deserialize {message.EventType}");
-                await bus.Publish(evt, ct);
-                break;
-            }
-            case nameof(CreditUpdatedIntegrationEvent):
-            {
-                var evt = JsonSerializer.Deserialize<CreditUpdatedIntegrationEvent>(message.Payload, JsonOptions)
-                    ?? throw new InvalidOperationException($"Failed to deserialize {message.EventType}");
-                await bus.Publish(evt, ct);
-                break;
-            }
-            case nameof(RiskAssessedIntegrationEvent):
-            {
-                var evt = JsonSerializer.Deserialize<RiskAssessedIntegrationEvent>(message.Payload, JsonOptions)
-                    ?? throw new InvalidOperationException($"Failed to deserialize {message.EventType}");
-                await bus.Publish(evt, ct);
-                break;
-            }
-            default:
-                logger.LogWarning(
-                    "Unknown event type {EventType} for outbox message {MessageId}. Skipping.",
-                    message.EventType, message.Id);
-                break;
+            logger.LogWarning(
+                "Unknown event type {EventType} for outbox message {MessageId}. Skipping.",
+                message.EventType, message.Id);
+            return;
         }
+
+        var evt = JsonSerializer.Deserialize(message.Payload, eventType, JsonOptions)
+            ?? throw new InvalidOperationException($"Failed to deserialize {message.EventType}");
+
+        await bus.Publish(evt, eventType, ct);
     }
 }

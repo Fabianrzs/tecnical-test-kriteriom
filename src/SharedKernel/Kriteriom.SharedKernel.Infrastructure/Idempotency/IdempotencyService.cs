@@ -1,9 +1,9 @@
 using System.Text;
-using Kriteriom.Credits.Application.Services;
+using Kriteriom.SharedKernel.Contracts.Idempotency;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace Kriteriom.Credits.Infrastructure.Idempotency;
+namespace Kriteriom.SharedKernel.Infrastructure.Idempotency;
 
 public class IdempotencyService(IDistributedCache cache, ILogger<IdempotencyService> logger)
     : IIdempotencyService

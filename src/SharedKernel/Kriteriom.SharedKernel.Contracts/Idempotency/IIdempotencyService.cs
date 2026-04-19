@@ -1,4 +1,4 @@
-namespace Kriteriom.Credits.Application.Services;
+namespace Kriteriom.SharedKernel.Contracts.Idempotency;
 
 public interface IIdempotencyService
 {

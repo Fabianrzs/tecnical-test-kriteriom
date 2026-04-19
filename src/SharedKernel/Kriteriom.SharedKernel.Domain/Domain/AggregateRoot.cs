@@ -2,7 +2,7 @@ namespace Kriteriom.SharedKernel.Domain;
 
 public abstract class AggregateRoot : Entity
 {
-    private readonly List<IDomainEvent> _domainEvents = new();
+    private readonly List<IDomainEvent> _domainEvents = [];
 
     public int Version { get; protected set; }
 
@@ -12,7 +12,13 @@ public abstract class AggregateRoot : Entity
 
     public IReadOnlyList<IDomainEvent> GetDomainEvents() => _domainEvents.AsReadOnly();
 
-    public void AddDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+    public void AddDomainEvent(IDomainEvent domainEvent)
+    {
+        _domainEvents.Add(domainEvent);
+        Version++;
+    }
+
+    protected void IncrementVersion() => Version++;
 
     public void ClearDomainEvents() => _domainEvents.Clear();
 }

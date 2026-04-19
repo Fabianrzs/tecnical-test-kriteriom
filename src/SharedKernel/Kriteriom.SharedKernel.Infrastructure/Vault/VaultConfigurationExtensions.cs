@@ -41,9 +41,11 @@ public static class VaultConfigurationExtensions
 
                 var (mount, subPath) = (parts[0], parts[1]);
 
-                var kv = vaultClient.V1.Secrets.KeyValue.V2
-                    .ReadSecretAsync(subPath, mountPoint: mount)
-                    .GetAwaiter().GetResult();
+                var task = vaultClient.V1.Secrets.KeyValue.V2
+                    .ReadSecretAsync(subPath, mountPoint: mount);
+                if (!task.Wait(TimeSpan.FromSeconds(5)))
+                    throw new TimeoutException($"Vault read timed out for path '{path}'");
+                var kv = task.GetAwaiter().GetResult();
 
                 foreach (var kv2 in kv.Data.Data)
                 {

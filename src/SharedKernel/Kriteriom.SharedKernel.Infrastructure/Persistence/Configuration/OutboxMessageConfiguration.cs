@@ -2,7 +2,7 @@ using Kriteriom.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Kriteriom.Credits.Infrastructure.Persistence.Configurations;
+namespace Kriteriom.SharedKernel.Infrastructure.Persistence;
 
 public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage>
 {

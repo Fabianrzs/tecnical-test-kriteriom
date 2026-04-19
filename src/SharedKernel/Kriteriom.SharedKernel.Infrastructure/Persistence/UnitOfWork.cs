@@ -1,9 +1,9 @@
-using Kriteriom.Credits.Application.Services;
+using Kriteriom.SharedKernel.Application.Services;
 using Microsoft.EntityFrameworkCore;
 
-namespace Kriteriom.Credits.Infrastructure.Persistence;
+namespace Kriteriom.SharedKernel.Infrastructure.Persistence;
 
-public class UnitOfWork(CreditsDbContext context) : IUnitOfWork
+public class UnitOfWork(DbContext context) : IUnitOfWork
 {
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => context.SaveChangesAsync(ct);
