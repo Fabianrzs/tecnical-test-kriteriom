@@ -33,6 +33,12 @@ public class CreditCreatedNotificationConsumer(
         var message = context.Message;
         var ct      = context.CancellationToken;
 
+        if (message.EventId == Guid.Empty)
+        {
+            logger.LogWarning("Skipping notification with empty EventId for CreditId={CreditId}", message.CreditId);
+            return;
+        }
+
         if (await notificationRepository.ExistsForEventAsync(message.EventId, ct))
         {
             logger.LogWarning(
@@ -43,7 +49,8 @@ public class CreditCreatedNotificationConsumer(
 
         const string subject = "Solicitud de Crédito Recibida";
         var body = $"Recibimos su solicitud de crédito {message.CreditId}. " +
-                   $"Monto: {message.Amount:C2}. Estado: Pendiente de evaluación de riesgo.";
+                   $"Monto: {message.Amount:C2}. Estado: Pendiente de evaluación de riesgo. " +
+                   $"Consulte su crédito en: http://portal.kriteriom.com/credits/{message.CreditId}";
         var recipient = $"client-{message.ClientId}";
 
         var notificationId = await notificationRepository.CreateAsync(new NotificationRecord
