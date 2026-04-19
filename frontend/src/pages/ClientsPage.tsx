@@ -1,8 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api, EMPLOYMENT_OPTIONS, CREDIT_STATUS, STATUS_COLORS } from "../api";
-import type { Client, Credit, PagedResult, ClientFinancialSummary } from "../api";
+import type { Client, Credit, PagedResult, ClientFinancialSummary, ClientsFilter } from "../api";
 import { Modal } from "../components/Modal";
 import { useToast } from "../components/Toast";
+
+const SCORE_TIER_OPTIONS = [
+  { value: "", label: "Cualquier score" },
+  { value: "good", label: "Bueno (≥ 700)" },
+  { value: "regular", label: "Regular (550–699)" },
+  { value: "low", label: "Bajo (< 550)" },
+];
+
+const EMPLOYMENT_FILTER_OPTIONS = [
+  { value: "", label: "Cualquier empleo" },
+  ...EMPLOYMENT_OPTIONS,
+];
+
+const EMPTY_FILTER: ClientsFilter = {};
 
 export function ClientsPage() {
   const [data, setData] = useState<PagedResult<Client> | null>(null);
@@ -13,30 +27,139 @@ export function ClientsPage() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [detail, setDetail] = useState<Client | null>(null);
   const { toast } = useToast();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [inputSearch, setInputSearch] = useState("");
+  const [inputEmployment, setInputEmployment] = useState("");
+  const [inputScoreTier, setInputScoreTier] = useState("");
+  const [inputIncomeMin, setInputIncomeMin] = useState("");
+  const [inputIncomeMax, setInputIncomeMax] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ClientsFilter>(EMPTY_FILTER);
+
+  const activeFilterCount = [
+    activeFilter.search,
+    activeFilter.employmentStatus !== undefined ? "x" : "",
+    activeFilter.scoreTier,
+    activeFilter.incomeMin !== undefined ? "x" : "",
+    activeFilter.incomeMax !== undefined ? "x" : "",
+  ].filter(Boolean).length;
+
+  function commitFilter(overrides: Partial<ClientsFilter> = {}) {
+    const next: ClientsFilter = {
+      search: inputSearch || undefined,
+      employmentStatus: inputEmployment !== "" ? inputEmployment : undefined,
+      scoreTier: inputScoreTier || undefined,
+      incomeMin: inputIncomeMin ? Number(inputIncomeMin) : undefined,
+      incomeMax: inputIncomeMax ? Number(inputIncomeMax) : undefined,
+      ...overrides,
+    };
+    setActiveFilter(next);
+    setPage(1);
+  }
+
+  function scheduleCommit(field: keyof ClientsFilter, value: string) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const ov: Partial<ClientsFilter> = {};
+      if (field === "search") ov.search = value || undefined;
+      if (field === "incomeMin") ov.incomeMin = value ? Number(value) : undefined;
+      if (field === "incomeMax") ov.incomeMax = value ? Number(value) : undefined;
+      commitFilter(ov);
+    }, 400);
+  }
+
+  function clearFilters() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setInputSearch(""); setInputEmployment(""); setInputScoreTier("");
+    setInputIncomeMin(""); setInputIncomeMax("");
+    setActiveFilter(EMPTY_FILTER);
+    setPage(1);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const result = await api.getClients(page, 10);
-      setData(result);
+      setData(await api.getClients(page, 20, activeFilter));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al cargar clientes");
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, activeFilter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
+  const items = data?.items ?? [];
 
   return (
     <div>
+      {/* Header */}
       <div style={s.header}>
         <h1 style={s.title}>Clientes</h1>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button style={s.btnSm} onClick={load} disabled={loading}>{loading ? "Actualizando..." : "Actualizar"}</button>
           <button style={s.btnPrimary} onClick={() => setShowCreate(true)}>+ Nuevo Cliente</button>
         </div>
+      </div>
+
+      {/* Filter bar — always visible */}
+      <div style={s.filterBar}>
+        <div style={s.filterGrid}>
+          <FilterField label="Buscar nombre / doc / email">
+            <input
+              placeholder="Nombre, documento o email..."
+              value={inputSearch}
+              onChange={e => { setInputSearch(e.target.value); scheduleCommit("search", e.target.value); }}
+            />
+          </FilterField>
+          <FilterField label="Situación laboral">
+            <select value={inputEmployment} onChange={e => {
+              setInputEmployment(e.target.value);
+              commitFilter({ employmentStatus: e.target.value || undefined });
+            }}>
+              {EMPLOYMENT_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Credit Score">
+            <select value={inputScoreTier} onChange={e => {
+              setInputScoreTier(e.target.value);
+              commitFilter({ scoreTier: e.target.value || undefined });
+            }}>
+              {SCORE_TIER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Ingreso mínimo (COP)">
+            <input
+              type="number"
+              placeholder="ej: 1000000"
+              value={inputIncomeMin}
+              onChange={e => { setInputIncomeMin(e.target.value); scheduleCommit("incomeMin", e.target.value); }}
+            />
+          </FilterField>
+          <FilterField label="Ingreso máximo (COP)">
+            <input
+              type="number"
+              placeholder="ej: 10000000"
+              value={inputIncomeMax}
+              onChange={e => { setInputIncomeMax(e.target.value); scheduleCommit("incomeMax", e.target.value); }}
+            />
+          </FilterField>
+          <FilterField label=" ">
+            <button
+              style={{ ...s.btnSm, width: "100%", color: activeFilterCount > 0 ? "#ef4444" : "#94a3b8" }}
+              onClick={clearFilters}
+            >
+              {activeFilterCount > 0 ? `✕ Limpiar (${activeFilterCount})` : "Sin filtros"}
+            </button>
+          </FilterField>
+        </div>
+        {activeFilterCount > 0 && data && (
+          <div style={{ fontSize: 12, color: "#6366f1", marginTop: 8 }}>
+            {data.totalCount} resultado{data.totalCount !== 1 ? "s" : ""} · {activeFilterCount} filtro{activeFilterCount !== 1 ? "s" : ""} activo{activeFilterCount !== 1 ? "s" : ""}
+          </div>
+        )}
       </div>
 
       {error && <p style={s.error}>{error}</p>}
@@ -44,8 +167,12 @@ export function ClientsPage() {
       <div style={s.card}>
         {loading ? (
           <p style={s.empty}>Cargando...</p>
-        ) : data?.items.length === 0 ? (
-          <p style={s.empty}>No hay clientes. Crea uno para comenzar.</p>
+        ) : items.length === 0 ? (
+          <p style={s.empty}>
+            {activeFilterCount > 0
+              ? "Ningún cliente coincide con los filtros aplicados."
+              : "No hay clientes. Crea uno para comenzar."}
+          </p>
         ) : (
           <table>
             <thead>
@@ -59,7 +186,7 @@ export function ClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {data?.items.map(c => (
+              {items.map(c => (
                 <tr key={c.id}>
                   <td>
                     <span style={s.link} onClick={() => setDetail(c)}>{c.fullName}</span>
@@ -81,6 +208,7 @@ export function ClientsPage() {
 
       {data && data.totalPages > 1 && (
         <div style={s.pager}>
+          <span style={s.muted}>{data.totalCount} clientes totales</span>
           <button style={s.btnSm} disabled={!data.hasPreviousPage} onClick={() => setPage(p => p - 1)}>← Anterior</button>
           <span style={s.muted}>Página {page} de {data.totalPages}</span>
           <button style={s.btnSm} disabled={!data.hasNextPage} onClick={() => setPage(p => p + 1)}>Siguiente →</button>
@@ -111,6 +239,17 @@ export function ClientsPage() {
   );
 }
 
+// ─── Filter field ─────────────────────────────────────────────────────────────
+
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
 // ─── Client Detail Modal with Tabs ────────────────────────────────────────────
 
 type TabKey = "perfil" | "creditos" | "pagos";
@@ -136,7 +275,6 @@ function ClientDetailModal({ client, onClose }: { client: Client; onClose: () =>
 
   return (
     <Modal title={client.fullName} onClose={onClose} maxWidth={640}>
-      {/* Tab bar */}
       <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
         {([
           ["perfil", "Perfil"],
@@ -180,7 +318,6 @@ function PerfilTab({ client, summary }: { client: Client; summary: ClientFinanci
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Score visual */}
       <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
           Credit Score
@@ -198,7 +335,6 @@ function PerfilTab({ client, summary }: { client: Client; summary: ClientFinanci
         </div>
       </div>
 
-      {/* Capacity gauge */}
       <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
           Capacidad de Endeudamiento (DTI)
@@ -213,8 +349,6 @@ function PerfilTab({ client, summary }: { client: Client; summary: ClientFinanci
         </div>
         <div style={{ position: "relative", height: 10, background: "#e2e8f0", borderRadius: 5, overflow: "hidden" }}>
           <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${capacityUsed}%`, background: dtiColor, borderRadius: 5, transition: "width 0.4s" }} />
-          {/* 60% limit marker */}
-          <div style={{ position: "absolute", left: "100%", top: -2, height: 14, width: 2, background: "#ef4444", opacity: 0.6 }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
           <span>0%</span>
@@ -226,12 +360,11 @@ function PerfilTab({ client, summary }: { client: Client; summary: ClientFinanci
             <strong style={{ color: "#22c55e" }}>
               {fmt(Math.max(0, client.monthlyIncome * 0.6 - summary.existingMonthlyDebt))}/mes
             </strong>
-            {" "}· {summary.activeCreditsCount} crédito{summary.activeCreditsCount !== 1 ? "s" : ""} activo{summary.activeCreditsCount !== 1 ? "s" : ""}
+            {" · "}{summary.activeCreditsCount} crédito{summary.activeCreditsCount !== 1 ? "s" : ""} activo{summary.activeCreditsCount !== 1 ? "s" : ""}
           </div>
         )}
       </div>
 
-      {/* Fields */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {[
           ["Email", client.email],
@@ -254,24 +387,38 @@ function PerfilTab({ client, summary }: { client: Client; summary: ClientFinanci
 // ─── Tab: Créditos ────────────────────────────────────────────────────────────
 
 function CreditosTab({ credits, income, loading }: { credits: Credit[]; income: number; loading: boolean }) {
+  const [statusFilter, setStatusFilter] = useState("");
+
   if (loading) return <p style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>Cargando...</p>;
   if (credits.length === 0) return <p style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>Sin créditos registrados.</p>;
 
-  const activeStatuses = ["Active"];
+  const displayed = statusFilter ? credits.filter(c => c.status === statusFilter) : credits;
   const totalDebt = credits
-    .filter(c => activeStatuses.includes(c.status))
+    .filter(c => c.status === "Active")
     .reduce((sum, c) => sum + monthlyPayment(c), 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {income > 0 && (
-        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#166534", display: "flex", justifyContent: "space-between" }}>
-          <span>Carga mensual total activa</span>
-          <strong>{fmt(totalDebt)}/mes · DTI {((totalDebt / income) * 100).toFixed(1)}%</strong>
-        </div>
-      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          style={{ fontSize: 12, padding: "4px 8px" }}
+        >
+          <option value="">Todos los estados ({credits.length})</option>
+          {Object.entries(CREDIT_STATUS).map(([k, v]) => {
+            const count = credits.filter(c => c.status === k).length;
+            return count > 0 ? <option key={k} value={k}>{v} ({count})</option> : null;
+          })}
+        </select>
+        {income > 0 && totalDebt > 0 && (
+          <span style={{ fontSize: 12, color: "#166534", background: "#f0fdf4", padding: "4px 10px", borderRadius: 6, whiteSpace: "nowrap" }}>
+            Carga activa: {fmt(totalDebt)}/mes · DTI {((totalDebt / income) * 100).toFixed(1)}%
+          </span>
+        )}
+      </div>
 
-      {credits.map(c => {
+      {displayed.map(c => {
         const cuota = monthlyPayment(c);
         const dti = income > 0 ? (cuota / income) * 100 : 0;
         const statusColor = STATUS_COLORS[c.status] ?? "#6b7280";
@@ -311,7 +458,6 @@ function CreditosTab({ credits, income, loading }: { credits: Credit[]; income: 
             {c.reason && (
               <p style={{ fontSize: 11, color: "#64748b", marginTop: 6, fontStyle: "italic" }}>{c.reason}</p>
             )}
-
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
               {new Date(c.createdAt).toLocaleDateString("es-CO")}
             </div>
@@ -359,7 +505,6 @@ function PagosTab({ credits, loading }: { credits: Credit[]; loading: boolean })
               </span>
             </div>
 
-            {/* Payment breakdown */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
               <AmortRow label="Cuota total" value={fmt(amort.payment)} color="#1e293b" bold />
               <div style={{ height: 1, background: "#f1f5f9" }} />
@@ -371,7 +516,6 @@ function PagosTab({ credits, loading }: { credits: Credit[]; loading: boolean })
               <AmortRow label="Saldo restante" value={fmt(amort.balance)} color="#64748b" />
             </div>
 
-            {/* Progress: paid off */}
             <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, display: "flex", justifyContent: "space-between" }}>
               <span>Capital amortizado</span>
               <span style={{ fontWeight: 600, color: "#22c55e" }}>{paidPct.toFixed(1)}%</span>
@@ -383,13 +527,22 @@ function PagosTab({ credits, loading }: { credits: Credit[]; loading: boolean })
               <span>{fmt(c.amount - amort.balance)} amortizado</span>
               <span>{fmt(amort.balance)} pendiente</span>
             </div>
-
             <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8" }}>
               {(c.interestRate * 100).toFixed(2)}% E.A. · {c.termMonths - amort.paymentNum} cuotas restantes
             </div>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Shared utilities & components ───────────────────────────────────────────
+
+function ProgressBar({ pct, color, height = 8 }: { pct: number; color: string; height?: number }) {
+  return (
+    <div style={{ height, background: "#e2e8f0", borderRadius: height / 2, overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, pct))}%`, background: color, borderRadius: height / 2, transition: "width 0.4s" }} />
     </div>
   );
 }
@@ -408,16 +561,6 @@ function AmortRow({ label, value, color, bold, pct, barColor }: {
           <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 2 }} />
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Shared utilities & components ───────────────────────────────────────────
-
-function ProgressBar({ pct, color, height = 8 }: { pct: number; color: string; height?: number }) {
-  return (
-    <div style={{ height, background: "#e2e8f0", borderRadius: height / 2, overflow: "hidden" }}>
-      <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, pct))}%`, background: color, borderRadius: height / 2, transition: "width 0.4s" }} />
     </div>
   );
 }
@@ -562,13 +705,15 @@ function fmt(n: number) {
 
 const s: Record<string, React.CSSProperties> = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: 700, color: "#1e293b" },
-  card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" },
-  btnPrimary: { background: "#6366f1", color: "#fff", fontWeight: 600, padding: "8px 16px" },
-  btnSm: { background: "#f1f5f9", color: "#374151", padding: "6px 12px", fontSize: 13, border: "none", borderRadius: 6 },
+  title: { fontSize: 24, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px" },
+  card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" },
+  filterBar: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 18px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" },
+  filterGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 },
+  btnPrimary: { background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", fontWeight: 700, padding: "9px 18px", border: "none", borderRadius: 8, cursor: "pointer", boxShadow: "0 2px 8px rgba(99,102,241,0.3)", fontSize: 13 },
+  btnSm: { background: "#f8fafc", color: "#374151", padding: "7px 14px", fontSize: 13, border: "1px solid #e2e8f0", borderRadius: 7, cursor: "pointer" },
   muted: { fontSize: 12, color: "#94a3b8" },
-  error: { color: "#ef4444", fontSize: 13, marginBottom: 12 },
-  empty: { padding: 32, textAlign: "center", color: "#94a3b8" },
-  link: { color: "#6366f1", cursor: "pointer", fontWeight: 500 },
-  pager: { display: "flex", gap: 12, alignItems: "center", justifyContent: "flex-end", marginTop: 12 },
+  error: { color: "#ef4444", fontSize: 13, marginBottom: 12, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px" },
+  empty: { padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 },
+  link: { color: "#6366f1", cursor: "pointer", fontWeight: 600 },
+  pager: { display: "flex", gap: 12, alignItems: "center", justifyContent: "flex-end", marginTop: 14 },
 };
