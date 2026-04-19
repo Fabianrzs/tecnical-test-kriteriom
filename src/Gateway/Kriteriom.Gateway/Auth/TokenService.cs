@@ -5,18 +5,28 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Kriteriom.Gateway.Auth;
 
-public class TokenService(IConfiguration config)
+public class TokenService
 {
-    private static readonly Dictionary<string, (string PasswordHash, string Role)> Users = new()
+    private readonly IConfiguration _config;
+    private readonly Dictionary<string, (string Password, string Role)> _users;
+
+    public TokenService(IConfiguration config)
     {
-        ["admin"]    = ("admin123",    "Admin"),
-        ["analyst"]  = ("analyst123",  "Analyst"),
-        ["readonly"] = ("readonly123", "ReadOnly")
-    };
+        _config = config;
+
+        // Load users from configuration (Vault / env vars in production)
+        // Default fallback values are for local development only
+        _users = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["admin"]    = (config["Auth:Admin:Password"]    ?? "admin123",    config["Auth:Admin:Role"]    ?? "Admin"),
+            ["analyst"]  = (config["Auth:Analyst:Password"]  ?? "analyst123",  config["Auth:Analyst:Role"]  ?? "Analyst"),
+            ["readonly"] = (config["Auth:ReadOnly:Password"] ?? "readonly123", config["Auth:ReadOnly:Role"] ?? "ReadOnly"),
+        };
+    }
 
     public TokenResult? GenerateToken(string username, string password)
     {
-        if (!Users.TryGetValue(username, out var user) || user.PasswordHash != password)
+        if (!_users.TryGetValue(username, out var user) || user.Password != password)
             return null;
 
         return new TokenResult(username, user.Role, GenerateAccessToken(username, user.Role));
@@ -24,10 +34,10 @@ public class TokenService(IConfiguration config)
 
     public string GenerateAccessToken(string username, string role)
     {
-        var secret   = config["Jwt:Secret"]!;
-        var issuer   = config["Jwt:Issuer"]!;
-        var audience = config["Jwt:Audience"]!;
-        var expiry   = config.GetValue<int>("Jwt:ExpiryMinutes", 60);
+        var secret   = _config["Jwt:Secret"]!;
+        var issuer   = _config["Jwt:Issuer"]!;
+        var audience = _config["Jwt:Audience"]!;
+        var expiry   = _config.GetValue<int>("Jwt:ExpiryMinutes", 60);
 
         var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -41,10 +51,10 @@ public class TokenService(IConfiguration config)
         };
 
         var token = new JwtSecurityToken(
-            issuer:   issuer,
-            audience: audience,
-            claims:   claims,
-            expires:  DateTime.UtcNow.AddMinutes(expiry),
+            issuer:            issuer,
+            audience:          audience,
+            claims:            claims,
+            expires:           DateTime.UtcNow.AddMinutes(expiry),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -54,16 +64,16 @@ public class TokenService(IConfiguration config)
 
     public TokenValidationParameters GetValidationParameters()
     {
-        var secret = config["Jwt:Secret"]!;
+        var secret = _config["Jwt:Secret"]!;
         return new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
-            ValidateIssuer   = true,
-            ValidIssuer      = config["Jwt:Issuer"],
-            ValidateAudience = true,
-            ValidAudience    = config["Jwt:Audience"],
-            ClockSkew        = TimeSpan.Zero
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
+            ValidateIssuer           = true,
+            ValidIssuer              = _config["Jwt:Issuer"],
+            ValidateAudience         = true,
+            ValidAudience            = _config["Jwt:Audience"],
+            ClockSkew                = TimeSpan.Zero
         };
     }
 }
