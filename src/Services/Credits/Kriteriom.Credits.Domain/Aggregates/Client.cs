@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using Kriteriom.Credits.Domain.Enums;
+using Kriteriom.Credits.Domain.Events;
 using Kriteriom.Credits.Domain.Exceptions;
 using Kriteriom.SharedKernel.Domain;
 
@@ -7,6 +9,9 @@ namespace Kriteriom.Credits.Domain.Aggregates;
 public class Client : AggregateRoot
 {
     private const int BasePoints = 300;
+
+    private static readonly Regex EmailRegex =
+        new(@"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public string FullName        { get; private set; } = string.Empty;
     public string Email           { get; private set; } = string.Empty;
@@ -28,8 +33,8 @@ public class Client : AggregateRoot
     {
         if (string.IsNullOrWhiteSpace(fullName))
             throw new InvalidCreditOperationException("FullName is required");
-        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
-            throw new InvalidCreditOperationException("A valid Email is required");
+        if (string.IsNullOrWhiteSpace(email) || !EmailRegex.IsMatch(email))
+            throw new InvalidCreditOperationException("Se requiere un email válido (formato: usuario@dominio.ext)");
         if (string.IsNullOrWhiteSpace(documentNumber))
             throw new InvalidCreditOperationException("DocumentNumber is required");
         if (monthlyIncome <= 0)
@@ -44,8 +49,12 @@ public class Client : AggregateRoot
             EmploymentStatus = employmentStatus,
             CreatedAt        = DateTime.UtcNow,
             UpdatedAt        = DateTime.UtcNow,
-            CreditScore = CalculateScore(monthlyIncome, employmentStatus)
+            CreditScore      = CalculateScore(monthlyIncome, employmentStatus)
         };
+
+        client.AddDomainEvent(new ClientCreatedDomainEvent(
+            client.Id, client.FullName, client.Email, client.DocumentNumber,
+            client.MonthlyIncome, client.EmploymentStatus.ToString()));
 
         return client;
     }
@@ -62,6 +71,10 @@ public class Client : AggregateRoot
         EmploymentStatus = employmentStatus;
         CreditScore      = CalculateScore(monthlyIncome, employmentStatus);
         UpdatedAt        = DateTime.UtcNow;
+        IncrementVersion();
+
+        AddDomainEvent(new ClientUpdatedDomainEvent(
+            Id, FullName, MonthlyIncome, EmploymentStatus.ToString()));
     }
 
     /// <summary>
@@ -101,6 +114,7 @@ public class Client : AggregateRoot
 
         CreditScore = Math.Max(BasePoints, CreditScore - penalty);
         UpdatedAt   = DateTime.UtcNow;
+        IncrementVersion();
     }
 
     public static int CalculateScore(decimal monthlyIncome, EmploymentStatus employment)

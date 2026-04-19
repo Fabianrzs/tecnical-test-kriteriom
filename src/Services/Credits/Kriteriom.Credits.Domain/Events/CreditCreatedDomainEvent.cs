@@ -6,4 +6,8 @@ public record CreditCreatedDomainEvent(
     Guid CreditId,
     Guid ClientId,
     decimal Amount,
-    decimal InterestRate) : DomainEvent;
+    decimal InterestRate,
+    int TermMonths,
+    decimal MonthlyIncome,
+    decimal ExistingMonthlyDebt,
+    int ClientCreditScore) : DomainEvent;

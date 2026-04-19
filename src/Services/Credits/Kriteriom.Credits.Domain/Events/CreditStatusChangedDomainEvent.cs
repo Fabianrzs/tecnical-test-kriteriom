@@ -6,4 +6,5 @@ namespace Kriteriom.Credits.Domain.Events;
 public record CreditStatusChangedDomainEvent(
     Guid CreditId,
     CreditStatus OldStatus,
-    CreditStatus NewStatus) : DomainEvent;
+    CreditStatus NewStatus,
+    DateTime UpdatedAt) : DomainEvent;

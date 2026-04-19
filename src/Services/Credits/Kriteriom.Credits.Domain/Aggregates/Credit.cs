@@ -30,7 +30,14 @@ public class Credit : AggregateRoot
 
     private Credit() { }
 
-    public static Credit Create(Guid clientId, decimal amount, decimal interestRate, int termMonths = 36)
+    public static Credit Create(
+        Guid clientId,
+        decimal amount,
+        decimal interestRate,
+        int termMonths = 36,
+        decimal monthlyIncome = 0m,
+        decimal existingMonthlyDebt = 0m,
+        int clientCreditScore = 0)
     {
         if (amount <= 0)
             throw new InvalidCreditOperationException("El monto debe ser mayor a cero");
@@ -52,7 +59,9 @@ public class Credit : AggregateRoot
             UpdatedAt    = DateTime.UtcNow,
         };
 
-        credit.AddDomainEvent(new CreditCreatedDomainEvent(credit.Id, clientId, amount, interestRate));
+        credit.AddDomainEvent(new CreditCreatedDomainEvent(
+            credit.Id, clientId, amount, interestRate, termMonths,
+            monthlyIncome, existingMonthlyDebt, clientCreditScore));
         return credit;
     }
 
@@ -66,13 +75,17 @@ public class Credit : AggregateRoot
         Status          = newStatus;
         RejectionReason = reason;
         UpdatedAt       = DateTime.UtcNow;
-        AddDomainEvent(new CreditStatusChangedDomainEvent(Id, oldStatus, newStatus));
+        AddDomainEvent(new CreditStatusChangedDomainEvent(Id, oldStatus, newStatus, UpdatedAt));
     }
 
     public void AssignRiskScore(decimal score, RiskDecision decision)
     {
         if (score is < 0 or > 100)
             throw new InvalidCreditOperationException("El puntaje de riesgo debe estar entre 0 y 100");
+
+        if (Status is not CreditStatus.Pending and not CreditStatus.UnderReview)
+            throw new InvalidCreditOperationException(
+                $"No se puede asignar puntaje de riesgo a un crédito en estado {Status}. Solo se permiten estados Pending o UnderReview.");
 
         RiskScore = score;
 
