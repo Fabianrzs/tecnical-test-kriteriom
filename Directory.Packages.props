@@ -2,17 +2,16 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
   <!-- Domain / Application -->
   <ItemGroup>
     <PackageVersion Include="MediatR" Version="12.4.1" />
     <PackageVersion Include="FluentValidation" Version="11.10.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.10.0" />
     <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.0" />
+    <PackageVersion Include="Polly.Core" Version="8.4.2" />
     <PackageVersion Include="Serilog" Version="4.2.0" />
     <PackageVersion Include="VaultSharp" Version="1.17.5.1" />
   </ItemGroup>
-
   <!-- Microsoft Extensions -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.1" />
@@ -23,14 +22,12 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.1" />
     <PackageVersion Include="System.Text.Json" Version="9.0.1" />
   </ItemGroup>
-
   <!-- Entity Framework Core -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.1" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
   </ItemGroup>
-
   <!-- Messaging / Resilience -->
   <ItemGroup>
     <PackageVersion Include="MassTransit" Version="8.3.6" />
@@ -39,7 +36,6 @@
     <PackageVersion Include="Polly.Extensions" Version="8.4.2" />
     <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
   </ItemGroup>
-
   <!-- API / Gateway -->
   <ItemGroup>
     <PackageVersion Include="Asp.Versioning.Mvc" Version="8.1.0" />
@@ -49,7 +45,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.1" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.4.0" />
   </ItemGroup>
-
   <!-- Observability / Metrics -->
   <ItemGroup>
     <PackageVersion Include="prometheus-net.AspNetCore" Version="8.2.1" />
@@ -59,7 +54,6 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.12" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
   </ItemGroup>
-
   <!-- Logging -->
   <ItemGroup>
     <PackageVersion Include="Serilog.AspNetCore" Version="8.0.3" />
@@ -67,20 +61,17 @@
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
   </ItemGroup>
-
   <!-- Health Checks -->
   <ItemGroup>
     <PackageVersion Include="AspNetCore.HealthChecks.Redis" Version="8.0.1" />
     <PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="8.0.2" />
     <PackageVersion Include="AspNetCore.HealthChecks.Uris" Version="8.0.1" />
   </ItemGroup>
-
   <!-- Hangfire -->
   <ItemGroup>
     <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.14" />
     <PackageVersion Include="Hangfire.PostgreSql" Version="1.20.9" />
   </ItemGroup>
-
   <!-- Testing -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />

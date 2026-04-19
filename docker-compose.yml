@@ -1,5 +1,3 @@
-version: '3.9'
-
 networks:
   credit-network:
     driver: bridge
@@ -162,6 +160,11 @@ services:
       FeatureFlags__SimulateFailures: "true"
       FeatureFlags__SimulateLatency: "true"
       FeatureFlags__LatencyMs: "100"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -188,6 +191,11 @@ services:
       RabbitMQ__Password: ${RABBITMQ_PASS}
       Jaeger__Host: jaeger
       CreditsApi__BaseUrl: "http://credits-api:5001"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -213,6 +221,11 @@ services:
       RabbitMQ__Username: ${RABBITMQ_USER}
       RabbitMQ__Password: ${RABBITMQ_PASS}
       Jaeger__Host: jaeger
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -238,6 +251,11 @@ services:
       Jaeger__Host: jaeger
       FeatureFlags__SimulateFailures: "true"
       Notifications__MaxCompensationRetries: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     depends_on:
       postgres:
         condition: service_healthy
@@ -264,6 +282,11 @@ services:
       CreditsApi__BaseUrl: "http://credits-api:5001"
       Hangfire__User: "admin"
       Hangfire__Password: "Hangf1r3@2026"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -288,6 +311,11 @@ services:
       ReverseProxy__Clusters__credits__Destinations__default__Address: "http://credits-api:5001"
       ReverseProxy__Clusters__audit__Destinations__default__Address: "http://audit-api:5003"
       ReverseProxy__Clusters__batch__Destinations__default__Address: "http://batch-processor:5005"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     depends_on:
       - credits-api
       - audit-api
