@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Hangfire;
 using Kriteriom.BatchProcessor.Persistence;
 using Kriteriom.SharedKernel.Messaging;
 using MassTransit;
@@ -22,6 +24,7 @@ public class CreditStatusRecalculationJob(
 {
     private const string JobName = "CreditStatusRecalculation";
 
+    [DisableConcurrentExecution(timeoutInSeconds: 0)]
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         int batchSize = configuration.GetValue<int>("BatchProcessing:BatchSize", 1000);
@@ -107,6 +110,7 @@ public class CreditStatusRecalculationJob(
 
                 var batchCredits = pageResult.Items.ToList();
                 int updatedInBatch = 0;
+                var batchErrors = new ConcurrentBag<string>();
 
                 // ─── Step 4: Parallel.ForEachAsync with bounded DOP ────────
                 await Parallel.ForEachAsync(
@@ -177,6 +181,7 @@ public class CreditStatusRecalculationJob(
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
                             logger.LogError(ex, "Error processing credit {CreditId}", credit.Id);
+                            batchErrors.Add($"Credit {credit.Id}: {ex.Message}");
 
                             await dbSemaphore.WaitAsync(innerCt);
                             try
@@ -204,9 +209,14 @@ public class CreditStatusRecalculationJob(
                 await dbContext.SaveChangesAsync(ct); // flush batch logs + checkpoint in one round-trip
 
                 // ─── Step 8: progress log ──────────────────────────────────
+                if (!batchErrors.IsEmpty)
+                    logger.LogWarning(
+                        "Batch {BatchNumber}: {ErrorCount} error(s). First errors: {Errors}",
+                        batchNumber, batchErrors.Count, string.Join("; ", batchErrors.Take(5)));
+
                 logger.LogInformation(
-                    "Batch {BatchNumber}: Processed {Processed}/{Total} credits ({Updated} updated)",
-                    batchNumber, checkpoint.ProcessedRecords, totalRecords, updatedInBatch);
+                    "Batch {BatchNumber}: Processed {Processed}/{Total} credits ({Updated} updated, {Errors} errors)",
+                    batchNumber, checkpoint.ProcessedRecords, totalRecords, updatedInBatch, batchErrors.Count);
 
                 batchNumber++;
 
