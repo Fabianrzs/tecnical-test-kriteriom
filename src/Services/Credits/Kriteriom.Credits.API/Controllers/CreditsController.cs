@@ -125,16 +125,25 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<CreditDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCredits(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] CreditStatus? status = null,
-        [FromQuery] Guid? clientId = null,
+        [FromQuery] int           page       = 1,
+        [FromQuery] int           pageSize   = 20,
+        [FromQuery] CreditStatus? status     = null,
+        [FromQuery] Guid?         clientId   = null,
+        [FromQuery] decimal?      amountMin  = null,
+        [FromQuery] decimal?      amountMax  = null,
+        [FromQuery] DateTime?     dateFrom   = null,
+        [FromQuery] DateTime?     dateTo     = null,
+        [FromQuery] string?       riskLevel  = null,
+        [FromQuery] string?       clientName = null,
         CancellationToken ct = default)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var query = new GetCreditsQuery(page, pageSize, status, clientId);
+        var query = new GetCreditsQuery(
+            page, pageSize, status, clientId,
+            amountMin, amountMax, dateFrom, dateTo,
+            riskLevel, clientName);
         var result = await _mediator.Send(query, ct);
 
         if (!result.IsSuccess)

@@ -60,14 +60,20 @@ public class ClientsController(IMediator mediator) : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ClientDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetClients(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] int               page             = 1,
+        [FromQuery] int               pageSize         = 20,
+        [FromQuery] string?           search           = null,
+        [FromQuery] EmploymentStatus? employmentStatus = null,
+        [FromQuery] string?           scoreTier        = null,
+        [FromQuery] decimal?          incomeMin        = null,
+        [FromQuery] decimal?          incomeMax        = null,
         CancellationToken ct = default)
     {
         if (page < 1) page = 1;
         if (pageSize is < 1 or > 100) pageSize = 20;
 
-        var result = await mediator.Send(new GetClientsQuery(page, pageSize), ct);
+        var result = await mediator.Send(
+            new GetClientsQuery(page, pageSize, search, employmentStatus, scoreTier, incomeMin, incomeMax), ct);
         return Ok(result.Value);
     }
 

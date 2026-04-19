@@ -38,9 +38,30 @@ public class AuditRepository(AuditDbContext dbContext, ILogger<AuditRepository> 
             .ToListAsync(ct);
 
     public async Task<(IEnumerable<AuditRecord> Items, int Total)> GetRecentAsync(
-        int page, int pageSize, CancellationToken ct = default)
+        int       page,
+        int       pageSize,
+        string?   eventType = null,
+        DateTime? dateFrom  = null,
+        DateTime? dateTo    = null,
+        Guid?     entityId  = null,
+        CancellationToken ct = default)
     {
-        var query = dbContext.AuditRecords.OrderByDescending(r => r.OccurredOn);
+        var query = dbContext.AuditRecords.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(eventType))
+            query = query.Where(r => r.EventType == eventType);
+
+        if (dateFrom.HasValue)
+            query = query.Where(r => r.OccurredOn >= dateFrom.Value.ToUniversalTime());
+
+        if (dateTo.HasValue)
+            query = query.Where(r => r.OccurredOn <= dateTo.Value.ToUniversalTime().AddDays(1));
+
+        if (entityId.HasValue)
+            query = query.Where(r => r.EntityId == entityId.Value);
+
+        query = query.OrderByDescending(r => r.OccurredOn);
+
         var total = await query.CountAsync(ct);
         var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return (items, total);

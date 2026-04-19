@@ -7,7 +7,18 @@ namespace Kriteriom.Credits.Domain.Repositories;
 public interface ICreditRepository
 {
     Task<Credit?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<(IEnumerable<Credit> Items, int Total)> GetAllAsync(int page, int pageSize, CreditStatus? status = null, Guid? clientId = null, CancellationToken ct = default);
+    Task<(IEnumerable<Credit> Items, int Total)> GetAllAsync(
+        int page,
+        int pageSize,
+        CreditStatus? status     = null,
+        Guid?         clientId   = null,
+        decimal?      amountMin  = null,
+        decimal?      amountMax  = null,
+        DateTime?     dateFrom   = null,
+        DateTime?     dateTo     = null,
+        string?       riskLevel  = null,
+        string?       clientName = null,
+        CancellationToken ct = default);
     Task<IEnumerable<Credit>> GetBySpecificationAsync(ISpecification<Credit> spec, CancellationToken ct = default);
     Task<int> CountBySpecificationAsync(ISpecification<Credit> spec, CancellationToken ct = default);
     Task AddAsync(Credit credit, CancellationToken ct = default);

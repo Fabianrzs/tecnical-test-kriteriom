@@ -19,16 +19,22 @@ public class GetCreditsQueryHandler(
             request.PageSize,
             request.Status,
             request.ClientId,
+            request.AmountMin,
+            request.AmountMax,
+            request.DateFrom,
+            request.DateTo,
+            request.RiskLevel,
+            request.ClientName,
             cancellationToken);
 
         var dtos = items.Select(c => c.ToDto()).ToList();
 
         var pagedResult = new PagedResult<CreditDto>
         {
-            Items = dtos,
+            Items      = dtos,
             TotalCount = total,
-            Page = request.Page,
-            PageSize = request.PageSize
+            Page       = request.Page,
+            PageSize   = request.PageSize
         };
 
         logger.LogDebug(

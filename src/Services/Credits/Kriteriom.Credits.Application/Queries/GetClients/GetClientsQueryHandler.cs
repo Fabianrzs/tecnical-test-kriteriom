@@ -10,7 +10,15 @@ public class GetClientsQueryHandler(IClientRepository repository) : IRequestHand
 {
     public async Task<Result<PagedResult<ClientDto>>> Handle(GetClientsQuery query, CancellationToken ct)
     {
-        var (items, total) = await repository.GetAllAsync(query.Page, query.PageSize, ct);
+        var (items, total) = await repository.GetAllAsync(
+            query.Page,
+            query.PageSize,
+            query.Search,
+            query.EmploymentStatus,
+            query.ScoreTier,
+            query.IncomeMin,
+            query.IncomeMax,
+            ct);
 
         var result = new PagedResult<ClientDto>
         {

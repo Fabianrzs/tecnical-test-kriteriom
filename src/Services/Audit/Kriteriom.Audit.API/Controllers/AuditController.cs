@@ -20,11 +20,20 @@ public class AuditController(
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRecent(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] int       page      = 1,
+        [FromQuery] int       pageSize  = 50,
+        [FromQuery] string?   eventType = null,
+        [FromQuery] DateTime? dateFrom  = null,
+        [FromQuery] DateTime? dateTo    = null,
+        [FromQuery] Guid?     entityId  = null,
         CancellationToken ct = default)
     {
-        var (items, total) = await auditRepository.GetRecentAsync(page, pageSize, ct);
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 200) pageSize = 50;
+
+        var (items, total) = await auditRepository.GetRecentAsync(
+            page, pageSize, eventType, dateFrom, dateTo, entityId, ct);
+
         return Ok(new
         {
             items,

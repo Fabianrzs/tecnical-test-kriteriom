@@ -14,24 +14,54 @@ public class CreditRepository(CreditsDbContext context, ILogger<CreditRepository
         => await context.Credits.FirstOrDefaultAsync(c => c.Id == id, ct);
 
     public async Task<(IEnumerable<Credit> Items, int Total)> GetAllAsync(
-        int page,
-        int pageSize,
-        CreditStatus? status = null,
-        Guid? clientId = null,
+        int           page,
+        int           pageSize,
+        CreditStatus? status     = null,
+        Guid?         clientId   = null,
+        decimal?      amountMin  = null,
+        decimal?      amountMax  = null,
+        DateTime?     dateFrom   = null,
+        DateTime?     dateTo     = null,
+        string?       riskLevel  = null,
+        string?       clientName = null,
         CancellationToken ct = default)
     {
-        var query = context.Credits
-            .AsNoTracking()
-            .Where(c => c.Amount > 0); 
-        
+        var query = context.Credits.AsNoTracking().AsQueryable();
+
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);
 
         if (clientId.HasValue)
             query = query.Where(c => c.ClientId == clientId.Value);
 
-        var total = await query.CountAsync(ct);
+        if (amountMin.HasValue)
+            query = query.Where(c => c.Amount >= amountMin.Value);
 
+        if (amountMax.HasValue)
+            query = query.Where(c => c.Amount <= amountMax.Value);
+
+        if (dateFrom.HasValue)
+            query = query.Where(c => c.CreatedAt >= dateFrom.Value.ToUniversalTime());
+
+        if (dateTo.HasValue)
+            query = query.Where(c => c.CreatedAt <= dateTo.Value.ToUniversalTime().AddDays(1));
+
+        if (!string.IsNullOrWhiteSpace(riskLevel))
+            query = riskLevel.ToLowerInvariant() switch
+            {
+                "none"   => query.Where(c => c.RiskScore == null),
+                "low"    => query.Where(c => c.RiskScore != null && c.RiskScore < 30),
+                "medium" => query.Where(c => c.RiskScore >= 30 && c.RiskScore < 60),
+                "high"   => query.Where(c => c.RiskScore >= 60),
+                _        => query
+            };
+
+        if (!string.IsNullOrWhiteSpace(clientName))
+            query = query.Where(c => context.Clients
+                .Any(cl => cl.Id == c.ClientId &&
+                           EF.Functions.ILike(cl.FullName, $"%{clientName}%")));
+
+        var total = await query.CountAsync(ct);
         var items = await query
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
@@ -39,24 +69,20 @@ public class CreditRepository(CreditsDbContext context, ILogger<CreditRepository
             .ToListAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("GetAllAsync page={Page} pageSize={PageSize} total={Total}", page, pageSize, total);
+            logger.LogDebug("GetAllAsync page={Page} size={PageSize} total={Total}", page, pageSize, total);
 
         return (items, total);
     }
 
     public async Task<IEnumerable<Credit>> GetBySpecificationAsync(ISpecification<Credit> spec, CancellationToken ct = default)
-    {
-        return await SpecificationEvaluator<Credit>
+        => await SpecificationEvaluator<Credit>
             .GetQuery(context.Credits.AsNoTracking(), spec)
             .ToListAsync(ct);
-    }
 
     public async Task<int> CountBySpecificationAsync(ISpecification<Credit> spec, CancellationToken ct = default)
-    {
-        return await SpecificationEvaluator<Credit>
+        => await SpecificationEvaluator<Credit>
             .GetQuery(context.Credits.AsNoTracking(), spec)
             .CountAsync(ct);
-    }
 
     public async Task AddAsync(Credit credit, CancellationToken ct = default)
         => await context.Credits.AddAsync(credit, ct);
@@ -68,44 +94,31 @@ public class CreditRepository(CreditsDbContext context, ILogger<CreditRepository
     }
 
     public async Task<IEnumerable<Credit>> GetForBatchProcessingAsync(
-        int batchSize,
-        int skip,
-        CancellationToken ct = default)
-    {
-        
-        return await context.Credits
+        int batchSize, int skip, CancellationToken ct = default)
+        => await context.Credits
             .AsNoTracking()
             .OrderBy(c => c.CreatedAt)
             .Skip(skip)
             .Take(batchSize)
             .ToListAsync(ct);
-    }
 
     public async Task<int> GetTotalCountAsync(CancellationToken ct = default)
-    {
-        return await context.Credits.CountAsync(ct);
-    }
+        => await context.Credits.CountAsync(ct);
 
     public async Task<Dictionary<int, int>> GetStatusCountsAsync(CancellationToken ct = default)
-    {
-        return await context.Credits
+        => await context.Credits
             .GroupBy(c => (int)c.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Status, x => x.Count, ct);
-    }
 
     public async Task<int> GetActiveCountForClientAsync(Guid clientId, CancellationToken ct = default)
-    {
-        return await context.Credits
+        => await context.Credits
             .AsNoTracking()
             .CountAsync(c => c.ClientId == clientId && c.Status == CreditStatus.Active, ct);
-    }
 
     public async Task<IEnumerable<Credit>> GetActiveCreditsForClientAsync(Guid clientId, CancellationToken ct = default)
-    {
-        return await context.Credits
+        => await context.Credits
             .AsNoTracking()
             .Where(c => c.ClientId == clientId && c.Status == CreditStatus.Active)
             .ToListAsync(ct);
-    }
 }
