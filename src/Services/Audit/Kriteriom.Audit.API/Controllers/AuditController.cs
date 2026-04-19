@@ -1,5 +1,6 @@
 using Kriteriom.Audit.Domain.Entities;
 using Kriteriom.Audit.Domain.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kriteriom.Audit.API.Controllers;
@@ -7,6 +8,7 @@ namespace Kriteriom.Audit.API.Controllers;
 [ApiController]
 [Route("api/audit")]
 [Produces("application/json")]
+[Authorize(Roles = "Admin,Analyst")]
 public class AuditController(
     IAuditRepository auditRepository,
     ILogger<AuditController> logger)

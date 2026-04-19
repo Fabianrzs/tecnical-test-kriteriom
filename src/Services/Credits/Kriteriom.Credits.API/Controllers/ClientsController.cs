@@ -9,6 +9,7 @@ using Kriteriom.Credits.Application.Queries.GetCredits;
 using Kriteriom.Credits.Domain.Enums;
 using Kriteriom.SharedKernel.Common;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kriteriom.Credits.API.Controllers;
@@ -18,6 +19,7 @@ namespace Kriteriom.Credits.API.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class ClientsController(IMediator mediator) : ControllerBase
 {
     /// <summary>Creates a new client profile.</summary>
@@ -111,6 +113,7 @@ public class ClientsController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>Returns a client's existing monthly debt load from active credits.</summary>
+    [AllowAnonymous]
     [HttpGet("{id:guid}/financial-summary")]
     [ProducesResponseType(typeof(ClientFinancialSummaryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

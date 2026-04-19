@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Kriteriom.Credits.API.Metrics;
 using Kriteriom.Credits.Application.Commands.CreateCredit;
 using Kriteriom.Credits.Application.Commands.ProcessRiskAssessment;
 using Kriteriom.Credits.Application.Commands.RecalculateCreditStatuses;
@@ -10,6 +11,7 @@ using Kriteriom.Credits.Application.Queries.GetCredits;
 using Kriteriom.Credits.Domain.Enums;
 using Kriteriom.SharedKernel.Common;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kriteriom.Credits.API.Controllers;
@@ -19,6 +21,7 @@ namespace Kriteriom.Credits.API.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class CreditsController(IMediator mediator, ILogger<CreditsController> logger) : ControllerBase
 {
     private readonly IMediator _mediator = mediator;
@@ -103,6 +106,7 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
             });
         }
 
+        CreditMetrics.CreatedTotal.Inc();
         return CreatedAtAction(
             nameof(GetCredit),
             new { id = result.Value!.Id },
@@ -115,6 +119,7 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
     /// <param name="page">Page number (1-based)</param>
     /// <param name="pageSize">Items per page (max 100)</param>
     /// <param name="status">Optional status filter</param>
+    /// <param name="clientId">Client Id</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Paged credit list</returns>
     [HttpGet]
@@ -179,6 +184,7 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
     /// <param name="request">New status and optional reason</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Updated credit resource</returns>
+    [AllowAnonymous]
     [HttpPut("{id:guid}/status")]
     [ProducesResponseType(typeof(CreditDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -228,6 +234,7 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
     /// <param name="request">Risk assessment data</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Updated credit with risk assessment applied</returns>
+    [AllowAnonymous]
     [HttpPost("{id:guid}/risk")]
     [ProducesResponseType(typeof(CreditDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -247,7 +254,16 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
 
         var result = await _mediator.Send(command, ct);
 
-        if (result.IsSuccess) return Ok(result.Value);
+        if (result.IsSuccess)
+        {
+            switch (request.Decision)
+            {
+                case "Approved":    CreditMetrics.ApprovedTotal.Inc();    break;
+                case "Rejected":    CreditMetrics.RejectedTotal.Inc();    break;
+                case "UnderReview": CreditMetrics.UnderReviewTotal.Inc(); break;
+            }
+            return Ok(result.Value);
+        }
         if (result.ErrorCode == "CREDIT_NOT_FOUND")
         {
             return NotFound(new ProblemDetails
@@ -268,6 +284,7 @@ public class CreditsController(IMediator mediator, ILogger<CreditsController> lo
 
     }
 
+    [AllowAnonymous]
     [HttpPost("recalculate-statuses")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> RecalculateStatuses(
