@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../Kriteriom.Audit.Infrastructure/Kriteriom.Audit.Infrastructure.csproj" />
     <ProjectReference Include="../../../SharedKernel/Kriteriom.SharedKernel.Infrastructure/Kriteriom.SharedKernel.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="MassTransit" />
     <PackageReference Include="MassTransit.RabbitMQ" />
     <PackageReference Include="Swashbuckle.AspNetCore" />

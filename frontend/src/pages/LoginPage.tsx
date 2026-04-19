@@ -7,7 +7,7 @@ interface Props {
 
 export function LoginPage({ onLogin }: Props) {
   const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("Admin@2026!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +44,7 @@ export function LoginPage({ onLogin }: Props) {
             {loading ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
-        <p style={s.hint}>admin / admin123 · analyst / analyst123 · readonly / readonly123</p>
+        <p style={s.hint}>admin / Admin@2026! · analyst / Analyst@2026! · readonly / ReadOnly@2026!</p>
       </div>
     </div>
   );

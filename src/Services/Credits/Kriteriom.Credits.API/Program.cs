@@ -1,5 +1,5 @@
+using System.Text;
 using FluentValidation;
-using Kriteriom.Credits.API.Consumers;
 using Kriteriom.Credits.API.Middleware;
 using Kriteriom.Credits.Application.Commands.CreateCredit;
 using Kriteriom.Credits.Infrastructure;
@@ -9,6 +9,9 @@ using Kriteriom.SharedKernel.Extensions;
 using Kriteriom.SharedKernel.Middleware;
 using Kriteriom.SharedKernel.Vault;
 using MediatR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Serilog;
 
 SerilogExtensions.ConfigureBootstrapLogger();
@@ -24,18 +27,40 @@ try
         enrichWithMachineInfo: true,
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj}{NewLine}{Exception}");
 
+    var jwtSecret   = builder.Configuration["Jwt:Secret"]   ?? "K3r1t3r10m-Sup3rS3cr3t-JWT-K3y-2026-ForDev";
+    var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "kriteriom-api-gateway";
+    var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "kriteriom-services";
+
+    builder.Services
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(opts =>
+        {
+            opts.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                ValidateIssuer           = true,
+                ValidIssuer              = jwtIssuer,
+                ValidateAudience         = true,
+                ValidAudience            = jwtAudience,
+                ClockSkew                = TimeSpan.Zero
+            };
+        });
+
+    builder.Services.AddAuthorization();
+
     builder.Services.AddMediatR(cfg =>
     {
         cfg.RegisterServicesFromAssembly(typeof(CreateCreditCommand).Assembly);
         cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
         cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
     });
 
     builder.Services.AddValidatorsFromAssemblyContaining<CreateCreditCommandValidator>();
 
-    builder.Services.AddCreditsInfrastructure(builder.Configuration, x =>
-        x.AddConsumer<RecalculateCreditStatusesConsumer>());
+    builder.Services.AddCreditsInfrastructure(builder.Configuration);
 
     builder.Services.AddServiceTelemetry(builder.Configuration, "credits-api", includeEfCore: true);
 
@@ -64,10 +89,10 @@ try
         "Credit management service with CQRS, Outbox Pattern, and Idempotency",
         c =>
         {
-            c.AddSecurityDefinition("IdempotencyKey", new()
+            c.AddSecurityDefinition("IdempotencyKey", new OpenApiSecurityScheme
             {
-                Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-                In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
                 Name = "Idempotency-Key",
                 Description = "Unique key to ensure idempotent processing of POST requests"
             });
@@ -98,6 +123,8 @@ try
     app.UseServiceMetrics("credits-api");
 
     app.UseRouting();
+    app.UseAuthentication();
+    app.UseAuthorization();
     app.MapControllers();
 
     app.MapHealthChecks("/health");

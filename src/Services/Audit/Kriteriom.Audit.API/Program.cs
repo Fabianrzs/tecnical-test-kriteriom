@@ -1,3 +1,4 @@
+using System.Text;
 using Kriteriom.Audit.API.Consumers;
 using Kriteriom.Audit.Domain.Repositories;
 using Kriteriom.Audit.Infrastructure.Persistence;
@@ -5,6 +6,8 @@ using Kriteriom.Audit.Infrastructure.Repositories;
 using Kriteriom.SharedKernel.Extensions;
 using Kriteriom.SharedKernel.Middleware;
 using Kriteriom.SharedKernel.Vault;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 SerilogExtensions.ConfigureBootstrapLogger();
@@ -18,6 +21,28 @@ try
 
     builder.Host.AddServiceSerilog();
 
+    var jwtSecret   = builder.Configuration["Jwt:Secret"]   ?? "K3r1t3r10m-Sup3rS3cr3t-JWT-K3y-2026-ForDev";
+    var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "kriteriom-api-gateway";
+    var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "kriteriom-services";
+
+    builder.Services
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(opts =>
+        {
+            opts.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                ValidateIssuer           = true,
+                ValidIssuer              = jwtIssuer,
+                ValidateAudience         = true,
+                ValidAudience            = jwtAudience,
+                ClockSkew                = TimeSpan.Zero
+            };
+        });
+
+    builder.Services.AddAuthorization();
+
     builder.Services.AddServiceDatabase<AuditDbContext>(builder.Configuration, npgsqlOptions: npgsql =>
         npgsql.MigrationsAssembly(typeof(AuditDbContext).Assembly.FullName));
 
@@ -29,6 +54,8 @@ try
         x.AddConsumer<CreditUpdatedAuditConsumer>();
         x.AddConsumer<RiskAssessedAuditConsumer>();
         x.AddConsumer<NotificationPermanentlyFailedAuditConsumer>();
+        x.AddConsumer<ClientCreatedAuditConsumer>();
+        x.AddConsumer<ClientUpdatedAuditConsumer>();
     });
 
     builder.Services.AddServiceTelemetry(builder.Configuration, "audit-api");
@@ -50,6 +77,8 @@ try
     app.UseServiceMetrics("audit-api");
 
     app.UseRouting();
+    app.UseAuthentication();
+    app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");
 

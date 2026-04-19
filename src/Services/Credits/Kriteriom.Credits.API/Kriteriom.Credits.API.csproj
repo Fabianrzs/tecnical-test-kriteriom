@@ -8,6 +8,7 @@
     <ProjectReference Include="../../../SharedKernel/Kriteriom.SharedKernel.Infrastructure/Kriteriom.SharedKernel.Infrastructure.csproj" />
     <ProjectReference Include="../Kriteriom.Credits.Application/Kriteriom.Credits.Application.csproj" />
     <ProjectReference Include="../Kriteriom.Credits.Infrastructure/Kriteriom.Credits.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="MediatR" />
     <PackageReference Include="Asp.Versioning.Mvc" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
